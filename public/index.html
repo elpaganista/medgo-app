@@ -208,21 +208,24 @@
         </div>
 
         <div class="side-container">
+          <!-- Anamnese apenas para o Médico -->
           <div class="card" id="anamnese-box">
             <h3>Ficha Clínico-Anamnese</h3>
             <textarea id="texto-anamnese" placeholder="Sintomas, hipótese diagnóstica e conduta médica..."></textarea>
           </div>
 
+          <!-- Documentos da Consulta -->
           <div class="card" id="chat-arquivos-box">
-            <h3>Documentos da Consulta</h3>
+            <h3 id="titulo-documentos">Documentos da Consulta</h3>
             <div id="lista-arquivos" class="lista-arquivos">
-              <p class="empty-files">Nenhum documento anexado ainda.</p>
+              <p class="empty-files">Nenhum documento disponível ainda.</p>
             </div>
             
-            <div class="upload-area">
+            <!-- Botão de Upload exclusivo do Médico -->
+            <div class="upload-area" id="area-upload-medico">
               <input type="file" id="input-arquivo" hidden>
               <button type="button" class="btn-secondary" onclick="document.getElementById('input-arquivo').click()">
-                📎 Enviar PDF / Receita / Exame
+                📎 Enviar Receita / Atestado / Exame (PDF)
               </button>
             </div>
           </div>

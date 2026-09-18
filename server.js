@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
+const path = path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const PDFDocument = require('pdfkit');
@@ -27,7 +27,7 @@ const upload = multer({ storage });
 // Estado da Aplicação em Memória
 let filaPacientes = [];
 let registroPacientesGeral = [];
-let medicos = []; // { id, nome, cpf, email, crm, senha, status: 'pendente' | 'aprovado' | 'bloqueado' }
+let medicos = [];
 let logsConsultas = [];
 let contadorAtendimentosHoje = 0;
 let dataAtualContador = new Date().toLocaleDateString('pt-BR');
@@ -113,7 +113,7 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
   res.status(404).send('Arquivo ZIP não encontrado.');
 });
 
-// WebSockets
+// WebSockets (Comunicação em Tempo Real)
 io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
 
@@ -152,6 +152,13 @@ io.on('connection', (socket) => {
 
   socket.on('signal', (data) => {
     io.to(data.to).emit('signal', { from: socket.id, signal: data.signal });
+  });
+
+  // Envio de arquivos em tempo real do médico para o paciente
+  socket.on('novo-arquivo-enviado', (data) => {
+    if (data.targetId) {
+      io.to(data.targetId).emit('receber-arquivo-medico', data.file);
+    }
   });
 
   socket.on('finalizar-consulta', async (dados) => {
@@ -201,7 +208,6 @@ io.on('connection', (socket) => {
           zipUrl: `/api/admin/download-log/${sessionId}`
         });
 
-        // Atualizar status no registro geral
         const pGeral = registroPacientesGeral.find(p => p.cpf === paciente.cpf);
         if (pGeral) pGeral.status = 'Atendido';
 
@@ -225,5 +231,5 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3000;
-server.listen(PORT, () => console.log(`🚀 MedGo rodando em http://localhost:${PORT}`));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`🚀 MedGo rodando na porta ${PORT}`));

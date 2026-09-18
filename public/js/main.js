@@ -1,9 +1,13 @@
 const socket = io();
 
+// Lista ampliada de servidores STUN públicos para conexão WebRTC em redes externas (4G/Wi-Fi)
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
   ]
 };
 
@@ -12,6 +16,7 @@ let peerConnection = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
 let arquivosTrocados = [];
+let pendingCandidates = [];
 
 // Modo Claro / Escuro
 const btnTema = document.getElementById('btn-tema');
@@ -114,7 +119,7 @@ document.getElementById('btn-logout-medico').addEventListener('click', () => {
   formLoginMedico.reset();
 });
 
-// Login Admin (Credenciais: Admin / Tr0sH!)
+// Login Admin
 document.getElementById('form-login-admin').addEventListener('submit', async (e) => {
   e.preventDefault();
   const user = document.getElementById('adm-user').value;
@@ -175,17 +180,37 @@ socket.on('atualizar-fila', (fila) => {
 window.chamarPaciente = (pacienteSocketId, nome, cpf) => {
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
   socket.emit('chamar-paciente', pacienteSocketId);
+  configurarInterfaceConsulta(true);
   iniciarChamadaVideo(true, pacienteSocketId);
 };
 
 socket.on('chamado-para-consulta', (dados) => {
   alert('O médico chamou para a consulta!');
   document.getElementById('tab-paciente').classList.add('hidden');
+  configurarInterfaceConsulta(false);
   iniciarChamadaVideo(false, dados.medicoSocketId);
 });
 
-async function iniciarChamadaVideo(isDoctor, targetSocketId) {
+// Configura a visualização (Esconde área de envio de arquivos e anamnese se for Paciente)
+function configurarInterfaceConsulta(isDoctor) {
   document.getElementById('sala-consulta').classList.remove('hidden');
+  
+  if (isDoctor) {
+    document.getElementById('anamnese-box').classList.remove('hidden');
+    document.getElementById('area-upload-medico').classList.remove('hidden');
+    document.getElementById('btn-encerrar-consulta').classList.remove('hidden');
+    document.getElementById('titulo-documentos').innerText = "Documentos da Consulta";
+  } else {
+    document.getElementById('anamnese-box').classList.add('hidden');
+    document.getElementById('area-upload-medico').classList.add('hidden');
+    document.getElementById('btn-encerrar-consulta').classList.add('hidden');
+    document.getElementById('titulo-documentos').innerText = "Documentos Recebidos do Médico";
+  }
+}
+
+// Inicialização WebRTC Estável
+async function iniciarChamadaVideo(isDoctor, targetSocketId) {
+  pendingCandidates = [];
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -195,7 +220,10 @@ async function iniciarChamadaVideo(isDoctor, targetSocketId) {
   }
 
   peerConnection = new RTCPeerConnection(rtcConfig);
-  if (localStream) localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+  if (localStream) {
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+  }
 
   peerConnection.ontrack = (event) => {
     document.getElementById('remote-video').srcObject = event.streams[0];
@@ -216,19 +244,32 @@ async function iniciarChamadaVideo(isDoctor, targetSocketId) {
 
 socket.on('signal', async (data) => {
   if (!peerConnection) return;
+
   if (data.signal.sdp) {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
+
+    // Processa candidatos ICE pendentes recebidos antes da descrição remota
+    while (pendingCandidates.length > 0) {
+      const candidate = pendingCandidates.shift();
+      await peerConnection.addIceCandidate(candidate);
+    }
+
     if (data.signal.sdp.type === 'offer') {
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       socket.emit('signal', { to: data.from, signal: { sdp: peerConnection.localDescription } });
     }
   } else if (data.signal.candidate) {
-    await peerConnection.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
+    const candidate = new RTCIceCandidate(data.signal.candidate);
+    if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+      await peerConnection.addIceCandidate(candidate);
+    } else {
+      pendingCandidates.push(candidate);
+    }
   }
 });
 
-// Envio de Arquivos
+// Envio de Arquivos (Apenas o médico executa)
 document.getElementById('input-arquivo').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -238,13 +279,30 @@ document.getElementById('input-arquivo').addEventListener('change', async (e) =>
 
   const res = await fetch('/api/upload', { method: 'POST', body: formData });
   const data = await res.json();
-  arquivosTrocados.push(data);
+  
+  // Notifica o paciente em tempo real via Socket do arquivo enviado
+  socket.emit('novo-arquivo-enviado', { 
+    targetId: currentConsultation ? currentConsultation.pacienteId : null,
+    file: data 
+  });
 
-  const lista = document.getElementById('lista-arquivos');
-  lista.innerHTML += `<div style="margin-top:6px;">📄 ${data.originalname} - <a href="${data.path}" target="_blank">Baixar</a></div>`;
+  adicionarArquivoNaLista(data);
 });
 
-// Finalizar Consulta & Manter Médico Online
+socket.on('receber-arquivo-medico', (fileData) => {
+  adicionarArquivoNaLista(fileData);
+});
+
+function adicionarArquivoNaLista(data) {
+  arquivosTrocados.push(data);
+  const lista = document.getElementById('lista-arquivos');
+  const emptyMsg = lista.querySelector('.empty-files');
+  if (emptyMsg) emptyMsg.remove();
+
+  lista.innerHTML += `<div style="margin-top:6px; padding:6px; background:var(--bg-color); border-radius:6px; font-size:0.85rem;">📄 <strong>${data.originalname}</strong> - <a href="${data.path}" target="_blank" style="color:var(--cyan);">Baixar Documento</a></div>`;
+}
+
+// Finalizar Consulta
 document.getElementById('btn-encerrar-consulta').addEventListener('click', () => {
   const anamnese = document.getElementById('texto-anamnese').value;
   
@@ -258,7 +316,6 @@ document.getElementById('btn-encerrar-consulta').addEventListener('click', () =>
 
   alert('Consulta finalizada! Log ZIP gerado para o Administrador.');
 
-  // Fechar conexão de mídia
   if (peerConnection) {
     peerConnection.close();
     peerConnection = null;
@@ -268,25 +325,23 @@ document.getElementById('btn-encerrar-consulta').addEventListener('click', () =>
     localStream = null;
   }
 
-  // Resetar área de atendimento
   document.getElementById('texto-anamnese').value = '';
   document.getElementById('lista-arquivos').innerHTML = '<p class="empty-files">Nenhum documento anexado ainda.</p>';
   arquivosTrocados = [];
   currentConsultation = null;
 
-  // Ocultar sala de chamada e manter médico no Dashboard da Fila
   document.getElementById('sala-consulta').classList.add('hidden');
   document.getElementById('dashboard-medico').classList.remove('hidden');
 });
 
-// Métricas e Painel Admin
+// Painel Admin
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
   renderAdminDashboard(data);
 }
 
-socket.on('atualizar-admin-medicos', (medicos) => carregarDadosAdmin());
+socket.on('atualizar-admin-medicos', () => carregarDadosAdmin());
 socket.on('atualizar-admin-pacientes', (data) => {
   document.getElementById('count-admin-fila').innerText = data.filaAtualCount;
   renderPacientesAdmin(data.registroPacientesGeral);
