@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedGo - Telemedicina Inteligente</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Topo da Aplicação -->
+  <header class="top-bar">
+    <div class="brand">
+      <img src="/logo.png" alt="MedGo Logo" class="brand-logo" onerror="this.style.display='none'">
+      <h1 class="brand-name">Med<span class="logo-go">Go</span></h1>
+    </div>
+    <div class="theme-control">
+      <button id="btn-tema" class="theme-btn" title="Alternar Modo Claro/Escuro">🌙 / ☀️</button>
+    </div>
+  </header>
+
+  <!-- Navegação por Abas Principais -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="paciente">Área do Paciente</button>
+    <button class="tab-btn" data-tab="medico">Área Médica</button>
+    <button class="tab-btn" data-tab="admin">Administração</button>
+  </nav>
+
+  <main class="container">
+    
+    <!-- 1. ABA PACIENTE -->
+    <section id="tab-paciente" class="tab-content active">
+      <div class="card centralizado" id="form-paciente-box">
+        <div class="card-header">
+          <h2>Atendimento MedGo</h2>
+          <p>Preencha seus dados para entrar na fila de consulta</p>
+        </div>
+        <form id="form-paciente">
+          <div class="input-group">
+            <label for="pac-nome">Nome Completo</label>
+            <input type="text" id="pac-nome" placeholder="Ex: João da Silva" required>
+          </div>
+          <div class="input-group">
+            <label for="pac-cpf">CPF</label>
+            <input type="text" id="pac-cpf" placeholder="000.000.000-00" required>
+          </div>
+          <div class="input-group">
+            <label for="pac-endereco">Endereço Completo</label>
+            <input type="text" id="pac-endereco" placeholder="Rua, Número, Bairro, Cidade" required>
+          </div>
+          <div class="input-group">
+            <label for="pac-telefone">Telefone / WhatsApp</label>
+            <input type="tel" id="pac-telefone" placeholder="(00) 90000-0000" required>
+          </div>
+          <div class="input-group">
+            <label for="pac-email">E-mail</label>
+            <input type="email" id="pac-email" placeholder="seu@email.com" required>
+          </div>
+          <button type="submit" class="btn-primary">Entrar na Sala de Espera</button>
+        </form>
+      </div>
+
+      <div class="card centralizado hidden" id="lobby-paciente">
+        <div class="lobby-content">
+          <h2>Sala de Espera Virtual</h2>
+          <p>Você está na fila de atendimento. Por favor, mantenha esta tela aberta. O médico iniciará sua chamada em breve...</p>
+          <div class="status-badge">Aguardando médico...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ABA MÉDICO -->
+    <section id="tab-medico" class="tab-content hidden">
+      <div class="card centralizado" id="box-medico-auth">
+        <div class="sub-tabs">
+          <button type="button" id="btn-med-login-view" class="sub-tab-btn active">Login</button>
+          <button type="button" id="btn-med-cad-view" class="sub-tab-btn">Novo Cadastro</button>
+        </div>
+
+        <!-- Form Login Médico -->
+        <form id="form-login-medico">
+          <h3>Acesso Médico</h3>
+          <div class="input-group">
+            <label for="med-login-cpf">CPF</label>
+            <input type="text" id="med-login-cpf" placeholder="CPF cadastrado" required>
+          </div>
+          <div class="input-group">
+            <label for="med-login-senha">Senha</label>
+            <input type="password" id="med-login-senha" placeholder="Sua senha" required>
+          </div>
+          <button type="submit" class="btn-primary">Acessar Painel</button>
+        </form>
+
+        <!-- Form Cadastro Médico -->
+        <form id="form-cadastro-medico" class="hidden">
+          <h3>Cadastro de Profissional</h3>
+          <div class="input-group">
+            <label for="med-cad-nome">Nome Completo</label>
+            <input type="text" id="med-cad-nome" placeholder="Dr. / Dra. Nome" required>
+          </div>
+          <div class="input-group">
+            <label for="med-cad-cpf">CPF</label>
+            <input type="text" id="med-cad-cpf" placeholder="000.000.000-00" required>
+          </div>
+          <div class="input-group">
+            <label for="med-cad-email">E-mail</label>
+            <input type="email" id="med-cad-email" placeholder="medico@medgo.com" required>
+          </div>
+          <div class="input-group">
+            <label for="med-cad-crm">CRM / UF</label>
+            <input type="text" id="med-cad-crm" placeholder="123456/CE" required>
+          </div>
+          <div class="input-group">
+            <label for="med-cad-senha">Senha</label>
+            <input type="password" id="med-cad-senha" placeholder="Crie uma senha" required>
+          </div>
+          <button type="submit" class="btn-secondary">Enviar Cadastro para Aprovação</button>
+        </form>
+      </div>
+
+      <!-- Dashboard da Fila para o Médico -->
+      <div class="card hidden" id="dashboard-medico">
+        <div class="dash-header flex-between">
+          <div>
+            <h2 id="saudacao-medico">Painel Médico</h2>
+            <span class="badge-count" id="count-fila">0 pacientes em espera</span>
+          </div>
+          <button id="btn-logout-medico" class="btn-outline-danger">Sair / Logoff</button>
+        </div>
+        <hr class="divider">
+        <h3>Fila de Atendimento</h3>
+        <ul id="lista-pacientes-fila" class="fila-list"></ul>
+      </div>
+    </section>
+
+    <!-- 3. ABA ADMINISTRADOR -->
+    <section id="tab-admin" class="tab-content hidden">
+      <div class="card centralizado" id="login-admin-box">
+        <h2>Painel Gestor MedGo</h2>
+        <form id="form-login-admin">
+          <div class="input-group">
+            <label for="adm-user">Usuário</label>
+            <input type="text" id="adm-user" placeholder="Admin" required>
+          </div>
+          <div class="input-group">
+            <label for="adm-pass">Senha</label>
+            <input type="password" id="adm-pass" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn-primary">Entrar no Sistema</button>
+        </form>
+      </div>
+
+      <!-- Dashboard Admin Geral -->
+      <div class="card hidden" id="dashboard-admin">
+        <div class="dash-header flex-between">
+          <h2>Gestão Geral MedGo</h2>
+          <button id="btn-logout-admin" class="btn-outline-danger">Sair / Logoff</button>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-title">Consultas Hoje</span>
+            <span class="metric-value" id="count-atendimentos-hoje">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Pacientes em Fila</span>
+            <span class="metric-value" id="count-admin-fila">0</span>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="admin-section">
+          <h3>Gestão de Profissionais Médicos</h3>
+          <div id="lista-medicos-admin" class="admin-list-box"></div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="admin-section">
+          <h3>Registro de Pacientes (Acompanhamento)</h3>
+          <div id="lista-pacientes-admin" class="admin-list-box"></div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="admin-section">
+          <h3>Histórico de Consultas & Log ZIP</h3>
+          <ul id="lista-logs-consultas" class="admin-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. SALA DE CONSULTA VIRTUAL -->
+    <section id="sala-consulta" class="hidden">
+      <div class="grid-consulta">
+        
+        <div class="video-container">
+          <div class="video-box main-video">
+            <span class="badge" id="label-remote-video">Vídeo Remoto</span>
+            <video id="remote-video" autoplay playsinline></video>
+          </div>
+          <div class="video-box sub-video">
+            <span class="badge" id="label-local-video">Seu Vídeo</span>
+            <video id="local-video" autoplay muted playsinline></video>
+          </div>
+        </div>
+
+        <div class="side-container">
+          <div class="card" id="anamnese-box">
+            <h3>Ficha Clínico-Anamnese</h3>
+            <textarea id="texto-anamnese" placeholder="Sintomas, hipótese diagnóstica e conduta médica..."></textarea>
+          </div>
+
+          <div class="card" id="chat-arquivos-box">
+            <h3>Documentos da Consulta</h3>
+            <div id="lista-arquivos" class="lista-arquivos">
+              <p class="empty-files">Nenhum documento anexado ainda.</p>
+            </div>
+            
+            <div class="upload-area">
+              <input type="file" id="input-arquivo" hidden>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('input-arquivo').click()">
+                📎 Enviar PDF / Receita / Exame
+              </button>
+            </div>
+          </div>
+
+          <button id="btn-encerrar-consulta" class="btn-danger">Encerrar Consulta & Salvar Log ZIP</button>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
