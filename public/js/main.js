@@ -1,14 +1,22 @@
 const socket = io();
 
-// Lista expandida de servidores STUN para garatia de travessia WebRTC em 4G/Wi-Fi externo
+// Configuração WebRTC com Servidores STUN + TURN públicos (Relay) para redes externas/4G
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    {
+      urls: 'turn:global.relay.metered.ca:80',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
+    },
+    {
+      urls: 'turn:global.relay.metered.ca:443',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
+    }
   ]
 };
 
@@ -220,7 +228,7 @@ socket.on('atualizar-fila', (fila) => {
 
 window.chamarPaciente = (pacienteSocketId, nome, cpf) => {
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
-  socket.emit('chamar-paciente', pacienteSocketId);
+  socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
   iniciarChamadaVideo(true, pacienteSocketId);
 };
@@ -248,6 +256,11 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
+// Sincronizar anamnese enquanto o médico digita
+document.getElementById('texto-anamnese').addEventListener('input', (e) => {
+  socket.emit('atualizar-anamnese-temp', e.target.value);
+});
+
 // Inicialização e Sinalização WebRTC Estável
 async function iniciarChamadaVideo(isDoctor, targetSocketId) {
   pendingCandidates = [];
@@ -266,7 +279,11 @@ async function iniciarChamadaVideo(isDoctor, targetSocketId) {
   }
 
   peerConnection.ontrack = (event) => {
-    document.getElementById('remote-video').srcObject = event.streams[0];
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo.srcObject !== event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
+      remoteVideo.play().catch(e => console.log('Erro ao reproduzir vídeo remoto:', e));
+    }
   };
 
   peerConnection.onicecandidate = (event) => {
@@ -276,7 +293,10 @@ async function iniciarChamadaVideo(isDoctor, targetSocketId) {
   };
 
   if (isDoctor) {
-    const offer = await peerConnection.createOffer();
+    const offer = await peerConnection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
+    });
     await peerConnection.setLocalDescription(offer);
     socket.emit('signal', { to: targetSocketId, signal: { sdp: peerConnection.localDescription } });
   }
@@ -285,26 +305,30 @@ async function iniciarChamadaVideo(isDoctor, targetSocketId) {
 socket.on('signal', async (data) => {
   if (!peerConnection) return;
 
-  if (data.signal.sdp) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
+  try {
+    if (data.signal.sdp) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
 
-    while (pendingCandidates.length > 0) {
-      const candidate = pendingCandidates.shift();
-      await peerConnection.addIceCandidate(candidate);
-    }
+      while (pendingCandidates.length > 0) {
+        const candidate = pendingCandidates.shift();
+        await peerConnection.addIceCandidate(candidate);
+      }
 
-    if (data.signal.sdp.type === 'offer') {
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      socket.emit('signal', { to: data.from, signal: { sdp: peerConnection.localDescription } });
+      if (data.signal.sdp.type === 'offer') {
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit('signal', { to: data.from, signal: { sdp: peerConnection.localDescription } });
+      }
+    } else if (data.signal.candidate) {
+      const candidate = new RTCIceCandidate(data.signal.candidate);
+      if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+        await peerConnection.addIceCandidate(candidate);
+      } else {
+        pendingCandidates.push(candidate);
+      }
     }
-  } else if (data.signal.candidate) {
-    const candidate = new RTCIceCandidate(data.signal.candidate);
-    if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-      await peerConnection.addIceCandidate(candidate);
-    } else {
-      pendingCandidates.push(candidate);
-    }
+  } catch (err) {
+    console.error('Erro no sinal WebRTC:', err);
   }
 });
 
@@ -340,20 +364,18 @@ function adicionarArquivoNaLista(data) {
   lista.innerHTML += `<div style="margin-top:6px; padding:6px; background:var(--bg-color); border-radius:6px; font-size:0.85rem;">📄 <strong>${data.originalname}</strong> - <a href="${data.path}" target="_blank" download style="color:var(--cyan); text-decoration:underline;">Baixar Documento</a></div>`;
 }
 
-// Finalizar Consulta
-document.getElementById('btn-encerrar-consulta').addEventListener('click', () => {
-  const anamnese = document.getElementById('texto-anamnese').value;
-  
-  socket.emit('finalizar-consulta', {
-    medico: medSessaoAtiva || { nome: 'Dr. MedGo', crm: '123456/CE' },
-    paciente: currentConsultation || { nome: 'Paciente Teste', cpf: '000.000.000-00' },
-    anamnese,
-    arquivosTrocados,
-    sessionId: currentConsultation ? currentConsultation.sessionId : Date.now()
-  });
+// Notificações de Encerramento e Desconexão
+socket.on('parceiro-desconectou', () => {
+  alert('A outra parte se desconectou. A consulta foi encerrada e o relatório final salvo automaticamente.');
+  limparEVoltarLobby();
+});
 
-  alert('Consulta finalizada! Log ZIP gerado para o Administrador.');
+socket.on('consulta-encerrada-pelo-medico', () => {
+  alert('A consulta foi finalizada.');
+  limparEVoltarLobby();
+});
 
+function limparEVoltarLobby() {
   if (peerConnection) {
     peerConnection.close();
     peerConnection = null;
@@ -369,7 +391,20 @@ document.getElementById('btn-encerrar-consulta').addEventListener('click', () =>
   currentConsultation = null;
 
   document.getElementById('sala-consulta').classList.add('hidden');
-  document.getElementById('dashboard-medico').classList.remove('hidden');
+  
+  if (medSessaoAtiva) {
+    document.getElementById('dashboard-medico').classList.remove('hidden');
+  } else {
+    document.getElementById('tab-paciente').classList.remove('hidden');
+    document.getElementById('lobby-paciente').classList.add('hidden');
+    document.getElementById('form-paciente-box').classList.remove('hidden');
+  }
+}
+
+// Finalizar Consulta Manualmente
+document.getElementById('btn-encerrar-consulta').addEventListener('click', () => {
+  const anamnese = document.getElementById('texto-anamnese').value;
+  socket.emit('finalizar-consulta', { anamnese });
 });
 
 // Painel Admin

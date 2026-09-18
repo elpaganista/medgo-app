@@ -12,7 +12,6 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.json());
-// Servir arquivos estáticos do frontend e pasta de uploads
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -49,6 +48,7 @@ function salvarMedicos(lista) {
 let medicos = carregarMedicos();
 let filaPacientes = [];
 let registroPacientesGeral = [];
+let consultasAtivas = new Map(); // socket.id -> dados da consulta em andamento
 let logsConsultas = [];
 let contadorAtendimentosHoje = 0;
 let dataAtualContador = new Date().toLocaleDateString('pt-BR');
@@ -71,7 +71,7 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   });
 });
 
-// Cadastro de Médico (Com checagem de duplicidade)
+// Cadastro de Médico
 app.post('/api/medico/cadastro', (req, res) => {
   const { nome, cpf, email, crm, senha } = req.body;
   
@@ -109,7 +109,7 @@ app.post('/api/medico/login', (req, res) => {
   res.json({ success: true, medico: { nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
 
-// Recuperação de Senha do Médico
+// Recuperação de Senha
 app.post('/api/medico/recuperar-senha', (req, res) => {
   const { email, novaSenha } = req.body;
   const medico = medicos.find(m => m.email.toLowerCase() === email.toLowerCase());
@@ -161,7 +161,68 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
   res.status(404).send('Arquivo ZIP não encontrado.');
 });
 
-// WebSockets (Comunicação em Tempo Real)
+// Função Auxiliar para Encerrar Consulta e Gerar ZIP
+function processarFinalizacaoConsulta(dados) {
+  checarResetDiario();
+  contadorAtendimentosHoje++;
+
+  const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
+  const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
+  const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
+
+  const doc = new PDFDocument();
+  const stream = fs.createWriteStream(pdfPath);
+  doc.pipe(stream);
+
+  doc.fontSize(20).text('MedGo - Relatório de Telemedicina', { align: 'center' });
+  doc.moveDown();
+  doc.fontSize(12).text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`);
+  doc.text(`Médico: ${medico.nome || 'Dr. MedGo'} (CRM: ${medico.crm || 'N/A'})`);
+  doc.text(`Paciente: ${paciente.nome || 'Paciente'} | CPF: ${paciente.cpf || 'N/A'}`);
+  doc.moveDown();
+  doc.fontSize(14).text('Ficha Clínico-Anamnese:');
+  doc.fontSize(11).text(anamnese || 'Consulta encerrada devido a desconexão ou término.');
+  doc.end();
+
+  stream.on('finish', () => {
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    archive.pipe(output);
+    archive.file(pdfPath, { name: `Anamnese_${paciente.nome || 'Paciente'}.pdf` });
+
+    (arquivosTrocados || []).forEach(file => {
+      const filePath = path.join(__dirname, 'uploads', file.filename);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: `Anexos/${file.originalname}` });
+      }
+    });
+
+    archive.finalize();
+
+    output.on('close', () => {
+      logsConsultas.push({
+        sessionId,
+        paciente: paciente.nome || 'Paciente',
+        medico: medico.nome || 'Dr. MedGo',
+        data: new Date().toLocaleString('pt-BR'),
+        zipUrl: `/api/admin/download-log/${sessionId}`
+      });
+
+      const pGeral = registroPacientesGeral.find(p => p.cpf === paciente.cpf);
+      if (pGeral) pGeral.status = 'Atendido';
+
+      io.emit('atualizar-admin-dashboard', {
+        logsConsultas,
+        atendimentosHoje: contadorAtendimentosHoje,
+        registroPacientesGeral,
+        filaAtualCount: filaPacientes.length
+      });
+    });
+  });
+}
+
+// WebSockets (Tempo Real)
 io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
 
@@ -182,20 +243,35 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('chamar-paciente', (pacienteId) => {
-    const paciente = filaPacientes.find(p => p.id === pacienteId);
+  socket.on('chamar-paciente', (dadosChamada) => {
+    const { pacienteSocketId, medicoInfo } = dadosChamada;
+    const paciente = filaPacientes.find(p => p.id === pacienteSocketId);
     if (paciente) {
       paciente.status = 'Em Atendimento';
     }
-    filaPacientes = filaPacientes.filter(p => p.id !== pacienteId);
+    filaPacientes = filaPacientes.filter(p => p.id !== pacienteSocketId);
     
+    const sessionId = Date.now().toString();
+    const dadosConsulta = {
+      sessionId,
+      medicoSocketId: socket.id,
+      pacienteSocketId,
+      medico: medicoInfo,
+      paciente: paciente || { nome: 'Paciente', cpf: '000.000.000-00' },
+      anamnese: '',
+      arquivosTrocados: []
+    };
+
+    consultasAtivas.set(socket.id, dadosConsulta);
+    consultasAtivas.set(pacienteSocketId, dadosConsulta);
+
     io.emit('atualizar-fila', filaPacientes);
     io.emit('atualizar-admin-pacientes', {
       registroPacientesGeral,
       filaAtualCount: filaPacientes.length
     });
     
-    io.to(pacienteId).emit('chamado-para-consulta', { medicoSocketId: socket.id });
+    io.to(pacienteSocketId).emit('chamado-para-consulta', { medicoSocketId: socket.id, sessionId });
   });
 
   socket.on('signal', (data) => {
@@ -203,73 +279,52 @@ io.on('connection', (socket) => {
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
+    const consulta = consultasAtivas.get(socket.id);
+    if (consulta) {
+      consulta.arquivosTrocados.push(data.file);
+    }
     if (data.targetId) {
       io.to(data.targetId).emit('receber-arquivo-medico', data.file);
     }
   });
 
+  socket.on('atualizar-anamnese-temp', (texto) => {
+    const consulta = consultasAtivas.get(socket.id);
+    if (consulta) {
+      consulta.anamnese = texto;
+    }
+  });
+
   socket.on('finalizar-consulta', async (dados) => {
-    checarResetDiario();
-    contadorAtendimentosHoje++;
+    const consulta = consultasAtivas.get(socket.id);
+    const payload = consulta || dados;
+    
+    if (dados.anamnese) payload.anamnese = dados.anamnese;
 
-    const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
-    const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
-    const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
+    processarFinalizacaoConsulta(payload);
 
-    const doc = new PDFDocument();
-    const stream = fs.createWriteStream(pdfPath);
-    doc.pipe(stream);
+    if (payload.pacienteSocketId) io.to(payload.pacienteSocketId).emit('consulta-encerrada-pelo-medico');
+    if (payload.medicoSocketId) io.to(payload.medicoSocketId).emit('consulta-encerrada-pelo-medico');
 
-    doc.fontSize(20).text('MedGo - Relatório de Telemedicina', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`);
-    doc.text(`Médico: ${medico.nome} (CRM: ${medico.crm})`);
-    doc.text(`Paciente: ${paciente.nome} | CPF: ${paciente.cpf}`);
-    doc.moveDown();
-    doc.fontSize(14).text('Ficha Clínico-Anamnese:');
-    doc.fontSize(11).text(anamnese || 'Nenhuma anotação registrada.');
-    doc.end();
-
-    stream.on('finish', () => {
-      const output = fs.createWriteStream(zipPath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
-
-      archive.pipe(output);
-      archive.file(pdfPath, { name: `Anamnese_${paciente.nome || 'Paciente'}.pdf` });
-
-      (arquivosTrocados || []).forEach(file => {
-        const filePath = path.join(__dirname, 'uploads', file.filename);
-        if (fs.existsSync(filePath)) {
-          archive.file(filePath, { name: `Anexos/${file.originalname}` });
-        }
-      });
-
-      archive.finalize();
-
-      output.on('close', () => {
-        logsConsultas.push({
-          sessionId,
-          paciente: paciente.nome || 'Paciente',
-          medico: medico.nome || 'Dr. MedGo',
-          data: new Date().toLocaleString('pt-BR'),
-          zipUrl: `/api/admin/download-log/${sessionId}`
-        });
-
-        const pGeral = registroPacientesGeral.find(p => p.cpf === paciente.cpf);
-        if (pGeral) pGeral.status = 'Atendido';
-
-        io.emit('atualizar-admin-dashboard', {
-          logsConsultas,
-          atendimentosHoje: contadorAtendimentosHoje,
-          registroPacientesGeral,
-          filaAtualCount: filaPacientes.length
-        });
-      });
-    });
+    consultasAtivas.delete(payload.medicoSocketId);
+    consultasAtivas.delete(payload.pacienteSocketId);
   });
 
   socket.on('disconnect', () => {
     filaPacientes = filaPacientes.filter(p => p.id !== socket.id);
+
+    // Se quem desconectou estava em consulta ativa
+    if (consultasAtivas.has(socket.id)) {
+      const consulta = consultasAtivas.get(socket.id);
+      processarFinalizacaoConsulta(consulta);
+
+      const outroSocketId = socket.id === consulta.medicoSocketId ? consulta.pacienteSocketId : consulta.medicoSocketId;
+      io.to(outroSocketId).emit('parceiro-desconectou');
+
+      consultasAtivas.delete(consulta.medicoSocketId);
+      consultasAtivas.delete(consulta.pacienteSocketId);
+    }
+
     io.emit('atualizar-fila', filaPacientes);
     io.emit('atualizar-admin-pacientes', {
       registroPacientesGeral,
