@@ -12,9 +12,11 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.json());
+// Servir arquivos estáticos do frontend e pasta de uploads
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-['uploads', 'logs'].forEach(dir => {
+['uploads', 'logs', 'data'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -24,15 +26,33 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Estado da Aplicação em Memória
+// Persistência de Médicos em JSON
+const FILE_MEDICOS = path.join(__dirname, 'data', 'medicos.json');
+
+function carregarMedicos() {
+  if (!fs.existsSync(FILE_MEDICOS)) {
+    fs.writeFileSync(FILE_MEDICOS, JSON.stringify([], null, 2));
+    return [];
+  }
+  try {
+    const data = fs.readFileSync(FILE_MEDICOS, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    return [];
+  }
+}
+
+function salvarMedicos(lista) {
+  fs.writeFileSync(FILE_MEDICOS, JSON.stringify(lista, null, 2));
+}
+
+let medicos = carregarMedicos();
 let filaPacientes = [];
 let registroPacientesGeral = [];
-let medicos = [];
 let logsConsultas = [];
 let contadorAtendimentosHoje = 0;
 let dataAtualContador = new Date().toLocaleDateString('pt-BR');
 
-// Reset automático do contador diário
 function checarResetDiario() {
   const hoje = new Date().toLocaleDateString('pt-BR');
   if (hoje !== dataAtualContador) {
@@ -51,18 +71,27 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   });
 });
 
-// Autenticação e Gestão de Médicos
+// Cadastro de Médico (Com checagem de duplicidade)
 app.post('/api/medico/cadastro', (req, res) => {
   const { nome, cpf, email, crm, senha } = req.body;
+  
   if (medicos.find(m => m.cpf === cpf)) {
-    return res.status(400).json({ error: 'CPF já cadastrado.' });
+    return res.status(400).json({ error: 'Este CPF já está cadastrado no sistema.' });
   }
+
+  if (medicos.find(m => m.email.toLowerCase() === email.toLowerCase())) {
+    return res.status(400).json({ error: 'Este E-mail já está cadastrado por outro médico.' });
+  }
+
   const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
   medicos.push(novoMedico);
+  salvarMedicos(medicos);
+
   io.emit('atualizar-admin-medicos', medicos);
   res.json({ success: true, message: 'Cadastro enviado para aprovação do Administrador.' });
 });
 
+// Login do Médico
 app.post('/api/medico/login', (req, res) => {
   const { cpf, senha } = req.body;
   const medico = medicos.find(m => m.cpf === cpf && m.senha === senha);
@@ -78,6 +107,24 @@ app.post('/api/medico/login', (req, res) => {
   }
 
   res.json({ success: true, medico: { nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
+});
+
+// Recuperação de Senha do Médico
+app.post('/api/medico/recuperar-senha', (req, res) => {
+  const { email, novaSenha } = req.body;
+  const medico = medicos.find(m => m.email.toLowerCase() === email.toLowerCase());
+
+  if (!medico) {
+    return res.status(404).json({ error: 'Nenhuma conta encontrada com este e-mail.' });
+  }
+
+  if (novaSenha) {
+    medico.senha = novaSenha;
+    salvarMedicos(medicos);
+    return res.json({ success: true, message: 'Senha redefinida com sucesso! Você já pode fazer login.' });
+  }
+
+  res.json({ success: true, message: 'Conta localizada! Digite sua nova senha.' });
 });
 
 // Endpoints Admin
@@ -97,6 +144,7 @@ app.post('/api/admin/medico/status', (req, res) => {
   const medico = medicos.find(m => m.id === medicoId);
   if (medico) {
     medico.status = novoStatus;
+    salvarMedicos(medicos);
     io.emit('atualizar-admin-medicos', medicos);
     res.json({ success: true });
   } else {
@@ -154,7 +202,6 @@ io.on('connection', (socket) => {
     io.to(data.to).emit('signal', { from: socket.id, signal: data.signal });
   });
 
-  // Envio de arquivos em tempo real do médico para o paciente
   socket.on('novo-arquivo-enviado', (data) => {
     if (data.targetId) {
       io.to(data.targetId).emit('receber-arquivo-medico', data.file);

@@ -90,6 +90,9 @@
             <input type="password" id="med-login-senha" placeholder="Sua senha" required>
           </div>
           <button type="submit" class="btn-primary">Acessar Painel</button>
+          <p style="text-align:center; margin-top:12px;">
+            <a href="#" id="link-esqueci-senha" style="color:var(--cyan); font-size:0.85rem; text-decoration:none;">Esqueceu sua senha?</a>
+          </p>
         </form>
 
         <!-- Form Cadastro Médico -->
@@ -116,6 +119,24 @@
             <input type="password" id="med-cad-senha" placeholder="Crie uma senha" required>
           </div>
           <button type="submit" class="btn-secondary">Enviar Cadastro para Aprovação</button>
+        </form>
+
+        <!-- Form Recuperar Senha -->
+        <form id="form-recuperar-senha" class="hidden">
+          <h3>Recuperar Senha</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted);">Digite o e-mail cadastrado e sua nova senha para redefinir o acesso.</p>
+          <div class="input-group">
+            <label for="rec-email">E-mail Cadastrado</label>
+            <input type="email" id="rec-email" placeholder="seu@email.com" required>
+          </div>
+          <div class="input-group">
+            <label for="rec-nova-senha">Nova Senha</label>
+            <input type="password" id="rec-nova-senha" placeholder="Digite a nova senha" required>
+          </div>
+          <button type="submit" class="btn-primary">Redefinir Senha</button>
+          <p style="text-align:center; margin-top:12px;">
+            <a href="#" id="link-voltar-login" style="color:var(--text-muted); font-size:0.85rem; text-decoration:none;">← Voltar ao Login</a>
+          </p>
         </form>
       </div>
 
@@ -208,20 +229,17 @@
         </div>
 
         <div class="side-container">
-          <!-- Anamnese apenas para o Médico -->
           <div class="card" id="anamnese-box">
             <h3>Ficha Clínico-Anamnese</h3>
             <textarea id="texto-anamnese" placeholder="Sintomas, hipótese diagnóstica e conduta médica..."></textarea>
           </div>
 
-          <!-- Documentos da Consulta -->
           <div class="card" id="chat-arquivos-box">
             <h3 id="titulo-documentos">Documentos da Consulta</h3>
             <div id="lista-arquivos" class="lista-arquivos">
               <p class="empty-files">Nenhum documento disponível ainda.</p>
             </div>
             
-            <!-- Botão de Upload exclusivo do Médico -->
             <div class="upload-area" id="area-upload-medico">
               <input type="file" id="input-arquivo" hidden>
               <button type="button" class="btn-secondary" onclick="document.getElementById('input-arquivo').click()">

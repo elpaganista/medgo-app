@@ -1,13 +1,14 @@
 const socket = io();
 
-// Lista ampliada de servidores STUN públicos para conexão WebRTC em redes externas (4G/Wi-Fi)
+// Lista expandida de servidores STUN para garatia de travessia WebRTC em 4G/Wi-Fi externo
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
   ]
 };
 
@@ -41,17 +42,21 @@ tabButtons.forEach(btn => {
   });
 });
 
-// Alternância Login / Cadastro Médico
+// Formulários Área Médica
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 const formLoginMedico = document.getElementById('form-login-medico');
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
+const formRecuperarSenha = document.getElementById('form-recuperar-senha');
+const linkEsqueciSenha = document.getElementById('link-esqueci-senha');
+const linkVoltarLogin = document.getElementById('link-voltar-login');
 
 btnMedLoginView.addEventListener('click', () => {
   btnMedLoginView.classList.add('active');
   btnMedCadView.classList.remove('active');
   formLoginMedico.classList.remove('hidden');
   formCadastroMedico.classList.add('hidden');
+  formRecuperarSenha.classList.add('hidden');
 });
 
 btnMedCadView.addEventListener('click', () => {
@@ -59,6 +64,20 @@ btnMedCadView.addEventListener('click', () => {
   btnMedLoginView.classList.remove('active');
   formCadastroMedico.classList.remove('hidden');
   formLoginMedico.classList.add('hidden');
+  formRecuperarSenha.classList.add('hidden');
+});
+
+linkEsqueciSenha.addEventListener('click', (e) => {
+  e.preventDefault();
+  formLoginMedico.classList.add('hidden');
+  formCadastroMedico.classList.add('hidden');
+  formRecuperarSenha.classList.remove('hidden');
+});
+
+linkVoltarLogin.addEventListener('click', (e) => {
+  e.preventDefault();
+  formRecuperarSenha.classList.add('hidden');
+  formLoginMedico.classList.remove('hidden');
 });
 
 // Cadastro de Médico
@@ -83,6 +102,28 @@ formCadastroMedico.addEventListener('submit', async (e) => {
     alert(data.message);
     formCadastroMedico.reset();
     btnMedLoginView.click();
+  } else {
+    alert(data.error);
+  }
+});
+
+// Redefinir Senha
+formRecuperarSenha.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('rec-email').value;
+  const novaSenha = document.getElementById('rec-nova-senha').value;
+
+  const res = await fetch('/api/medico/recuperar-senha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, novaSenha })
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    alert(data.message);
+    formRecuperarSenha.reset();
+    linkVoltarLogin.click();
   } else {
     alert(data.error);
   }
@@ -191,7 +232,6 @@ socket.on('chamado-para-consulta', (dados) => {
   iniciarChamadaVideo(false, dados.medicoSocketId);
 });
 
-// Configura a visualização (Esconde área de envio de arquivos e anamnese se for Paciente)
 function configurarInterfaceConsulta(isDoctor) {
   document.getElementById('sala-consulta').classList.remove('hidden');
   
@@ -208,7 +248,7 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Inicialização WebRTC Estável
+// Inicialização e Sinalização WebRTC Estável
 async function iniciarChamadaVideo(isDoctor, targetSocketId) {
   pendingCandidates = [];
 
@@ -248,7 +288,6 @@ socket.on('signal', async (data) => {
   if (data.signal.sdp) {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
 
-    // Processa candidatos ICE pendentes recebidos antes da descrição remota
     while (pendingCandidates.length > 0) {
       const candidate = pendingCandidates.shift();
       await peerConnection.addIceCandidate(candidate);
@@ -269,7 +308,7 @@ socket.on('signal', async (data) => {
   }
 });
 
-// Envio de Arquivos (Apenas o médico executa)
+// Envio de Arquivos pelo Médico
 document.getElementById('input-arquivo').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -280,7 +319,6 @@ document.getElementById('input-arquivo').addEventListener('change', async (e) =>
   const res = await fetch('/api/upload', { method: 'POST', body: formData });
   const data = await res.json();
   
-  // Notifica o paciente em tempo real via Socket do arquivo enviado
   socket.emit('novo-arquivo-enviado', { 
     targetId: currentConsultation ? currentConsultation.pacienteId : null,
     file: data 
@@ -299,7 +337,7 @@ function adicionarArquivoNaLista(data) {
   const emptyMsg = lista.querySelector('.empty-files');
   if (emptyMsg) emptyMsg.remove();
 
-  lista.innerHTML += `<div style="margin-top:6px; padding:6px; background:var(--bg-color); border-radius:6px; font-size:0.85rem;">📄 <strong>${data.originalname}</strong> - <a href="${data.path}" target="_blank" style="color:var(--cyan);">Baixar Documento</a></div>`;
+  lista.innerHTML += `<div style="margin-top:6px; padding:6px; background:var(--bg-color); border-radius:6px; font-size:0.85rem;">📄 <strong>${data.originalname}</strong> - <a href="${data.path}" target="_blank" download style="color:var(--cyan); text-decoration:underline;">Baixar Documento</a></div>`;
 }
 
 // Finalizar Consulta
