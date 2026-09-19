@@ -1,31 +1,11 @@
 const socket = io();
 
-// Configuração WebRTC com Servidores STUN + TURN públicos (Relay) para redes externas/4G
-const rtcConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    {
-      urls: 'turn:global.relay.metered.ca:80',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
-    },
-    {
-      urls: 'turn:global.relay.metered.ca:443',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
-    }
-  ]
-};
-
 let localStream = null;
-let peerConnection = null;
+let peer = null;
+let currentCall = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
 let arquivosTrocados = [];
-let pendingCandidates = [];
 
 // Modo Claro / Escuro
 const btnTema = document.getElementById('btn-tema');
@@ -226,18 +206,70 @@ socket.on('atualizar-fila', (fila) => {
   });
 });
 
-window.chamarPaciente = (pacienteSocketId, nome, cpf) => {
+// Inicialização do PeerJS
+function inicializarPeerJS() {
+  if (peer) return;
+
+  // Cria o nó PeerJS utilizando o próprio ID do Socket.io para alinhamento direto
+  peer = new Peer(socket.id, {
+    debug: 1,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        {
+          urls: 'turn:global.relay.metered.ca:80',
+          username: 'e823f6eb7e39ef695420e181',
+          credential: 'K8a2x8C83/aJ9fGL'
+        },
+        {
+          urls: 'turn:global.relay.metered.ca:443',
+          username: 'e823f6eb7e39ef695420e181',
+          credential: 'K8a2x8C83/aJ9fGL'
+        }
+      ]
+    }
+  });
+
+  // Atendimento de chamadas recebidas (Lado Paciente)
+  peer.on('call', async (call) => {
+    currentCall = call;
+    try {
+      if (!localStream) {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById('local-video').srcObject = localStream;
+      }
+      call.answer(localStream);
+
+      call.on('stream', (remoteStream) => {
+        const remoteVideo = document.getElementById('remote-video');
+        remoteVideo.srcObject = remoteStream;
+        remoteVideo.play().catch(e => console.log('Erro ao dar play no vídeo:', e));
+      });
+    } catch (err) {
+      console.error('Erro ao capturar mídia local ao atender:', err);
+    }
+  });
+}
+
+// Conectar ao Socket para garantir ID do PeerJS
+socket.on('connect', () => {
+  inicializarPeerJS();
+});
+
+window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
   socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
-  iniciarChamadaVideo(true, pacienteSocketId);
+  iniciarChamadaPeer(pacienteSocketId);
 };
 
 socket.on('chamado-para-consulta', (dados) => {
   alert('O médico chamou para a consulta!');
   document.getElementById('tab-paciente').classList.add('hidden');
   configurarInterfaceConsulta(false);
-  iniciarChamadaVideo(false, dados.medicoSocketId);
 });
 
 function configurarInterfaceConsulta(isDoctor) {
@@ -256,81 +288,31 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Sincronizar anamnese enquanto o médico digita
+// Sincronizar anamnese temporária
 document.getElementById('texto-anamnese').addEventListener('input', (e) => {
   socket.emit('atualizar-anamnese-temp', e.target.value);
 });
 
-// Inicialização e Sinalização WebRTC Estável
-async function iniciarChamadaVideo(isDoctor, targetSocketId) {
-  pendingCandidates = [];
-
+// Inicia a chamada via PeerJS (Lado Médico)
+async function iniciarChamadaPeer(targetSocketId) {
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    document.getElementById('local-video').srcObject = localStream;
-  } catch (err) {
-    console.warn('Câmera/Microfone indisponíveis:', err);
-  }
-
-  peerConnection = new RTCPeerConnection(rtcConfig);
-
-  if (localStream) {
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-  }
-
-  peerConnection.ontrack = (event) => {
-    const remoteVideo = document.getElementById('remote-video');
-    if (remoteVideo.srcObject !== event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-      remoteVideo.play().catch(e => console.log('Erro ao reproduzir vídeo remoto:', e));
+    if (!localStream) {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      document.getElementById('local-video').srcObject = localStream;
     }
-  };
 
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      socket.emit('signal', { to: targetSocketId, signal: { candidate: event.candidate } });
-    }
-  };
+    const call = peer.call(targetSocketId, localStream);
+    currentCall = call;
 
-  if (isDoctor) {
-    const offer = await peerConnection.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true
+    call.on('stream', (remoteStream) => {
+      const remoteVideo = document.getElementById('remote-video');
+      remoteVideo.srcObject = remoteStream;
+      remoteVideo.play().catch(e => console.log('Erro ao dar play no vídeo:', e));
     });
-    await peerConnection.setLocalDescription(offer);
-    socket.emit('signal', { to: targetSocketId, signal: { sdp: peerConnection.localDescription } });
+  } catch (err) {
+    console.error('Erro ao acessar dispositivos de áudio/vídeo:', err);
   }
 }
-
-socket.on('signal', async (data) => {
-  if (!peerConnection) return;
-
-  try {
-    if (data.signal.sdp) {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
-
-      while (pendingCandidates.length > 0) {
-        const candidate = pendingCandidates.shift();
-        await peerConnection.addIceCandidate(candidate);
-      }
-
-      if (data.signal.sdp.type === 'offer') {
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        socket.emit('signal', { to: data.from, signal: { sdp: peerConnection.localDescription } });
-      }
-    } else if (data.signal.candidate) {
-      const candidate = new RTCIceCandidate(data.signal.candidate);
-      if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-        await peerConnection.addIceCandidate(candidate);
-      } else {
-        pendingCandidates.push(candidate);
-      }
-    }
-  } catch (err) {
-    console.error('Erro no sinal WebRTC:', err);
-  }
-});
 
 // Envio de Arquivos pelo Médico
 document.getElementById('input-arquivo').addEventListener('change', async (e) => {
@@ -376,9 +358,9 @@ socket.on('consulta-encerrada-pelo-medico', () => {
 });
 
 function limparEVoltarLobby() {
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
+  if (currentCall) {
+    currentCall.close();
+    currentCall = null;
   }
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
