@@ -6,7 +6,6 @@
   <title>MedGo - Telemedicina Inteligente</title>
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="stylesheet" href="/css/style.css">
-  <!-- Biblioteca PeerJS para WebRTC estável -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -23,10 +22,10 @@
   </header>
 
   <!-- Navegação por Abas Principais -->
-  <nav class="tabs-nav">
-    <button class="tab-btn active" data-tab="paciente">Área do Paciente</button>
-    <button class="tab-btn" data-tab="medico">Área Médica</button>
-    <button class="tab-btn" data-tab="admin">Administração</button>
+  <nav class="tabs-nav" id="main-nav-tabs">
+    <button class="tab-btn active" data-tab="paciente" id="nav-btn-paciente">Área do Paciente</button>
+    <button class="tab-btn" data-tab="medico" id="nav-btn-medico">Área Médica</button>
+    <button class="tab-btn" data-tab="admin" id="nav-btn-admin">Administração</button>
   </nav>
 
   <main class="container">
@@ -187,9 +186,21 @@
             <span class="metric-value" id="count-atendimentos-hoje">0</span>
           </div>
           <div class="metric-card">
+            <span class="metric-title">Consultas Mês Atual</span>
+            <span class="metric-value" id="count-atendimentos-mes">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Histórico Geral de Acessos</span>
+            <span class="metric-value" id="count-total-acessos">0</span>
+          </div>
+          <div class="metric-card">
             <span class="metric-title">Pacientes em Fila</span>
             <span class="metric-value" id="count-admin-fila">0</span>
           </div>
+        </div>
+
+        <div style="text-align:right; margin-bottom:10px;">
+          <button class="btn-small btn-danger" onclick="limparBancoDados('stats')">🗑️ Resetar Contadores</button>
         </div>
 
         <hr class="divider">
@@ -201,17 +212,19 @@
 
         <hr class="divider">
 
-        <div class="admin-section">
+        <div class="admin-section flex-between">
           <h3>Registro de Pacientes (Acompanhamento)</h3>
-          <div id="lista-pacientes-admin" class="admin-list-box"></div>
+          <button class="btn-small btn-danger" onclick="limparBancoDados('pacientes')">Limpar Lista Pacientes</button>
         </div>
+        <div id="lista-pacientes-admin" class="admin-list-box"></div>
 
         <hr class="divider">
 
-        <div class="admin-section">
+        <div class="admin-section flex-between">
           <h3>Histórico de Consultas & Log ZIP</h3>
-          <ul id="lista-logs-consultas" class="admin-list"></ul>
+          <button class="btn-small btn-danger" onclick="limparBancoDados('logs')">Limpar Histórico ZIPs</button>
         </div>
+        <ul id="lista-logs-consultas" class="admin-list"></ul>
       </div>
     </section>
 
@@ -222,11 +235,11 @@
         <div class="video-container">
           <div class="video-box main-video">
             <span class="badge" id="label-remote-video">Vídeo Remoto</span>
-            <video id="remote-video" autoplay playsinline></video>
+            <video id="remote-video" autoplay playsinline webkit-playsinline></video>
           </div>
           <div class="video-box sub-video">
             <span class="badge" id="label-local-video">Seu Vídeo</span>
-            <video id="local-video" autoplay muted playsinline></video>
+            <video id="local-video" autoplay muted playsinline webkit-playsinline></video>
           </div>
         </div>
 

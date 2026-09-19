@@ -117,7 +117,7 @@ formRecuperarSenha.addEventListener('submit', async (e) => {
   }
 });
 
-// Login do Médico
+// Login do Médico: Restringe abas
 formLoginMedico.addEventListener('submit', async (e) => {
   e.preventDefault();
   const cpf = document.getElementById('med-login-cpf').value;
@@ -135,6 +135,9 @@ formLoginMedico.addEventListener('submit', async (e) => {
     document.getElementById('saudacao-medico').innerText = `Dr(a). ${data.medico.nome}`;
     document.getElementById('box-medico-auth').classList.add('hidden');
     document.getElementById('dashboard-medico').classList.remove('hidden');
+
+    document.getElementById('nav-btn-paciente').classList.add('hidden');
+    document.getElementById('nav-btn-admin').classList.add('hidden');
   } else {
     alert(data.error);
   }
@@ -146,6 +149,9 @@ document.getElementById('btn-logout-medico').addEventListener('click', () => {
   document.getElementById('dashboard-medico').classList.add('hidden');
   document.getElementById('box-medico-auth').classList.remove('hidden');
   formLoginMedico.reset();
+
+  document.getElementById('nav-btn-paciente').classList.remove('hidden');
+  document.getElementById('nav-btn-admin').classList.remove('hidden');
 });
 
 // Login Admin
@@ -170,7 +176,7 @@ document.getElementById('btn-logout-admin').addEventListener('click', () => {
   document.getElementById('form-login-admin').reset();
 });
 
-// Paciente entra na fila
+// Paciente entra na fila e esconde barra de abas
 document.getElementById('form-paciente').addEventListener('submit', (e) => {
   e.preventDefault();
   const dados = {
@@ -184,6 +190,8 @@ document.getElementById('form-paciente').addEventListener('submit', (e) => {
   socket.emit('entrar-fila', dados);
   document.getElementById('form-paciente-box').classList.add('hidden');
   document.getElementById('lobby-paciente').classList.remove('hidden');
+
+  document.getElementById('main-nav-tabs').classList.add('hidden');
 });
 
 // Atualizar fila
@@ -210,7 +218,6 @@ socket.on('atualizar-fila', (fila) => {
 function inicializarPeerJS() {
   if (peer) return;
 
-  // Cria o nó PeerJS utilizando o próprio ID do Socket.io para alinhamento direto
   peer = new Peer(socket.id, {
     debug: 1,
     config: {
@@ -233,28 +240,31 @@ function inicializarPeerJS() {
     }
   });
 
-  // Atendimento de chamadas recebidas (Lado Paciente)
   peer.on('call', async (call) => {
     currentCall = call;
     try {
       if (!localStream) {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        document.getElementById('local-video').srcObject = localStream;
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+          audio: true 
+        });
+        const locVid = document.getElementById('local-video');
+        locVid.srcObject = localStream;
+        locVid.play().catch(e => console.log('Erro local play:', e));
       }
       call.answer(localStream);
 
       call.on('stream', (remoteStream) => {
         const remoteVideo = document.getElementById('remote-video');
         remoteVideo.srcObject = remoteStream;
-        remoteVideo.play().catch(e => console.log('Erro ao dar play no vídeo:', e));
+        remoteVideo.play().catch(e => console.log('Erro remote play:', e));
       });
     } catch (err) {
-      console.error('Erro ao capturar mídia local ao atender:', err);
+      console.error('Erro ao capturar mídia local no paciente:', err);
     }
   });
 }
 
-// Conectar ao Socket para garantir ID do PeerJS
 socket.on('connect', () => {
   inicializarPeerJS();
 });
@@ -274,6 +284,7 @@ socket.on('chamado-para-consulta', (dados) => {
 
 function configurarInterfaceConsulta(isDoctor) {
   document.getElementById('sala-consulta').classList.remove('hidden');
+  document.getElementById('main-nav-tabs').classList.add('hidden');
   
   if (isDoctor) {
     document.getElementById('anamnese-box').classList.remove('hidden');
@@ -288,17 +299,20 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Sincronizar anamnese temporária
 document.getElementById('texto-anamnese').addEventListener('input', (e) => {
   socket.emit('atualizar-anamnese-temp', e.target.value);
 });
 
-// Inicia a chamada via PeerJS (Lado Médico)
 async function iniciarChamadaPeer(targetSocketId) {
   try {
     if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      document.getElementById('local-video').srcObject = localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+        audio: true 
+      });
+      const locVid = document.getElementById('local-video');
+      locVid.srcObject = localStream;
+      locVid.play().catch(e => console.log('Erro local play:', e));
     }
 
     const call = peer.call(targetSocketId, localStream);
@@ -307,14 +321,14 @@ async function iniciarChamadaPeer(targetSocketId) {
     call.on('stream', (remoteStream) => {
       const remoteVideo = document.getElementById('remote-video');
       remoteVideo.srcObject = remoteStream;
-      remoteVideo.play().catch(e => console.log('Erro ao dar play no vídeo:', e));
+      remoteVideo.play().catch(e => console.log('Erro remote play:', e));
     });
   } catch (err) {
-    console.error('Erro ao acessar dispositivos de áudio/vídeo:', err);
+    console.error('Erro ao acessar mídia no médico:', err);
   }
 }
 
-// Envio de Arquivos pelo Médico
+// Envio de Arquivos
 document.getElementById('input-arquivo').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -346,7 +360,7 @@ function adicionarArquivoNaLista(data) {
   lista.innerHTML += `<div style="margin-top:6px; padding:6px; background:var(--bg-color); border-radius:6px; font-size:0.85rem;">📄 <strong>${data.originalname}</strong> - <a href="${data.path}" target="_blank" download style="color:var(--cyan); text-decoration:underline;">Baixar Documento</a></div>`;
 }
 
-// Notificações de Encerramento e Desconexão
+// Desconexão e Finalização
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou. A consulta foi encerrada e o relatório final salvo automaticamente.');
   limparEVoltarLobby();
@@ -376,20 +390,21 @@ function limparEVoltarLobby() {
   
   if (medSessaoAtiva) {
     document.getElementById('dashboard-medico').classList.remove('hidden');
+    document.getElementById('main-nav-tabs').classList.remove('hidden');
   } else {
     document.getElementById('tab-paciente').classList.remove('hidden');
     document.getElementById('lobby-paciente').classList.add('hidden');
     document.getElementById('form-paciente-box').classList.remove('hidden');
+    document.getElementById('main-nav-tabs').classList.remove('hidden');
   }
 }
 
-// Finalizar Consulta Manualmente
 document.getElementById('btn-encerrar-consulta').addEventListener('click', () => {
   const anamnese = document.getElementById('texto-anamnese').value;
   socket.emit('finalizar-consulta', { anamnese });
 });
 
-// Painel Admin
+// Painel Admin & Exclusão de Registros
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
@@ -403,6 +418,8 @@ socket.on('atualizar-admin-pacientes', (data) => {
 });
 socket.on('atualizar-admin-dashboard', (data) => {
   document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje;
+  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
+  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
   document.getElementById('count-admin-fila').innerText = data.filaAtualCount;
   renderLogsAdmin(data.logsConsultas);
   renderPacientesAdmin(data.registroPacientesGeral);
@@ -410,11 +427,23 @@ socket.on('atualizar-admin-dashboard', (data) => {
 
 function renderAdminDashboard(data) {
   document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje;
+  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
+  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
   document.getElementById('count-admin-fila').innerText = data.filaAtualCount;
   renderMedicosAdmin(data.medicos);
   renderPacientesAdmin(data.registroPacientesGeral);
   renderLogsAdmin(data.logsConsultas);
 }
+
+window.limparBancoDados = async (tipo) => {
+  if (!confirm(`Tem certeza que deseja apagar os dados da categoria [${tipo}]? Esta ação é irreversível.`)) return;
+  await fetch('/api/admin/limpar-historico', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo })
+  });
+  carregarDadosAdmin();
+};
 
 function renderMedicosAdmin(medicos) {
   const container = document.getElementById('lista-medicos-admin');
