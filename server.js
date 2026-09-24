@@ -92,19 +92,22 @@ function obterMedicosComStatus() {
   }));
 }
 
-// ENDPOINT SEGURO DO TWILIO (Manda os servidores TURN sem travar o GitHub Push)
+// ENDPOINT SEGURO DO TWILIO (Usando variáveis de ambiente)
 app.get('/api/get-turn-credentials', async (req, res) => {
   try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID || 'AC4fc6fa2baf203a2c1239977481743bd7';
-    const authToken = process.env.TWILIO_AUTH_TOKEN || 'a89eb79df8d7cc08604bd4e479bee9';
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+    if (!accountSid || !authToken) {
+      throw new Error("Credenciais da Twilio não configuradas no ambiente.");
+    }
     
     const client = twilio(accountSid, authToken);
     const token = await client.tokens.create();
 
     res.json({ iceServers: token.iceServers });
   } catch (error) {
-    console.error('Erro ao buscar credenciais Twilio:', error);
-    // Fallback de emergência caso a Twilio falhe
+    console.warn('Usando fallback público do WebRTC:', error.message);
     res.json({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },

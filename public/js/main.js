@@ -12,30 +12,28 @@ let camAtiva = true;
 let candidatosPendentes = [];
 let remoteStream = null;
 
-// Servidores STUN/TURN Globais com suporte a TCP/UDP
-const rtcConfig = {
+// Configuração WebRTC dinâmica
+let rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelay',
-      credential: 'openrelay'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelay',
-      credential: 'openrelay'
-    },
-    {
-      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelay',
-      credential: 'openrelay'
-    }
+    { urls: 'stun:global.stun.twilio.com:3478' }
   ]
 };
+
+// Busca os servidores TURN oficiais da Twilio via backend antes de ligar
+async function carregarServidoresTurnTwilio() {
+  try {
+    const res = await fetch('/api/get-turn-credentials');
+    const data = await res.json();
+    if (data.iceServers && data.iceServers.length > 0) {
+      rtcConfig.iceServers = data.iceServers;
+      console.log('✅ Servidores TURN da Twilio carregados com sucesso!');
+    }
+  } catch (err) {
+    console.warn('⚠️ Falha ao carregar Twilio TURN, usando fallback público.', err);
+  }
+}
+carregarServidoresTurnTwilio();
 
 // MÁSCARAS DE ENTRADA
 function aplicarMascaraCPF(e) {
