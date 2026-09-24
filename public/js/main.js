@@ -33,11 +33,31 @@ function switchTab(tabName) {
   });
 }
 
-// Inicializa o PeerJS na Nuvem Oficial (evita erro 502/400 do Render)
+// Auxiliar seguro para reprodução de vídeo sem estourar AbortError
+async function safePlayVideo(videoElement, stream, isMuted = false) {
+  if (!videoElement || !stream) return;
+
+  videoElement.muted = isMuted;
+  videoElement.playsInline = true;
+
+  // Evita reatribuir e interromper o play se a mesma stream já estiver rodando
+  if (videoElement.srcObject !== stream) {
+    videoElement.srcObject = stream;
+  }
+
+  try {
+    await videoElement.play();
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.warn('Aviso de autoplay no vídeo:', err);
+    }
+  }
+}
+
+// Inicializa o PeerJS na Nuvem Oficial
 function iniciarPeer() {
   if (peer && !peer.destroyed) return peer;
 
-  // Limpa o socket.id de caracteres especiais se houver
   const peerIdClean = socket.id ? socket.id.replace(/[^a-zA-Z0-9]/g, '') : null;
   if (!peerIdClean) return null;
 
@@ -63,20 +83,18 @@ function iniciarPeer() {
   return peer;
 }
 
-// Vincula a chamada com verificação de segurança contra TypeError
+// Vincula a chamada e gerencia o vídeo remoto
 function wireCall(call) {
   if (!call) return;
   currentCall = call;
 
-  // Garante a leitura do ID sem quebrar a execução se o objeto mudar
   targetSocketId = call.peer || call.provider?.id || targetSocketId;
 
   call.on('stream', (stream) => {
     remoteStream = stream;
     const remoteVideo = document.getElementById('remote-video');
     if (remoteVideo) {
-      remoteVideo.srcObject = stream;
-      remoteVideo.play().catch(e => console.warn('Erro play remoto:', e));
+      safePlayVideo(remoteVideo, stream, false);
     }
   });
 
@@ -94,9 +112,7 @@ async function obterMidiaLocal() {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     const locVid = document.getElementById('local-video');
     if (locVid) {
-      locVid.srcObject = localStream;
-      locVid.muted = true;
-      locVid.play().catch(e => console.warn('Erro play local:', e));
+      await safePlayVideo(locVid, localStream, true);
     }
     return localStream;
   } catch (err) {
