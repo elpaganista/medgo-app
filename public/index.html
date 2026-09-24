@@ -44,15 +44,15 @@
           </div>
           <div class="input-group">
             <label for="pac-cpf">CPF</label>
-            <input type="text" id="pac-cpf" placeholder="000.000.000-00" required>
+            <input type="text" id="pac-cpf" placeholder="000.000.000-00" maxlength="14" required>
           </div>
           <div class="input-group">
             <label for="pac-endereco">Endereço Completo</label>
-            <input type="text" id="pac-endereco" placeholder="Rua, Número, Bairro, Cidade" required>
+            <input type="text" id="pac-endereco" placeholder="Rua, Número, Bairro" required>
           </div>
           <div class="input-group">
             <label for="pac-telefone">Telefone / WhatsApp</label>
-            <input type="tel" id="pac-telefone" placeholder="(00) 90000-0000" required>
+            <input type="tel" id="pac-telefone" placeholder="(00) 90000-0000" maxlength="15" required>
           </div>
           <div class="input-group">
             <label for="pac-email">E-mail</label>
@@ -84,7 +84,7 @@
           <h3>Acesso Médico</h3>
           <div class="input-group">
             <label for="med-login-cpf">CPF</label>
-            <input type="text" id="med-login-cpf" placeholder="CPF cadastrado" required>
+            <input type="text" id="med-login-cpf" placeholder="000.000.000-00" maxlength="14" required>
           </div>
           <div class="input-group">
             <label for="med-login-senha">Senha</label>
@@ -105,7 +105,7 @@
           </div>
           <div class="input-group">
             <label for="med-cad-cpf">CPF</label>
-            <input type="text" id="med-cad-cpf" placeholder="000.000.000-00" required>
+            <input type="text" id="med-cad-cpf" placeholder="000.000.000-00" maxlength="14" required>
           </div>
           <div class="input-group">
             <label for="med-cad-email">E-mail</label>
@@ -199,8 +199,9 @@
           </div>
         </div>
 
-        <div style="text-align:right; margin-bottom:10px;">
-          <button class="btn-small btn-danger" onclick="limparBancoDados('stats')">🗑️ Resetar Contadores</button>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-bottom:10px; flex-wrap:wrap;">
+          <a href="/api/admin/download-relatorio-diario" class="btn-small btn-success" style="padding:8px 12px; text-decoration:none;">📦 Baixar Relatório Diário (.ZIP)</a>
+          <button class="btn-small btn-danger" style="padding:8px 12px;" onclick="limparBancoDados('stats')">🗑️ Resetar Contadores</button>
         </div>
 
         <hr class="divider">
@@ -230,16 +231,29 @@
 
     <!-- 4. SALA DE CONSULTA VIRTUAL -->
     <section id="sala-consulta" class="hidden">
+      <div id="info-medico-paciente-banner" class="info-banner hidden">
+        🩺 <span id="nome-medico-atendendo">Em consulta médica</span>
+      </div>
+
       <div class="grid-consulta">
         
         <div class="video-container">
+          <!-- Vídeo Remoto (Quadrado e Grande) -->
           <div class="video-box main-video">
             <span class="badge" id="label-remote-video">Vídeo Remoto</span>
             <video id="remote-video" autoplay playsinline webkit-playsinline></video>
           </div>
+
+          <!-- Vídeo Local (Quadrado e Grande) -->
           <div class="video-box sub-video">
             <span class="badge" id="label-local-video">Seu Vídeo</span>
             <video id="local-video" autoplay muted playsinline webkit-playsinline></video>
+          </div>
+
+          <!-- Controles de Mídia (Ativar/Desativar Câmera e Microfone) -->
+          <div class="video-controls">
+            <button id="btn-toggle-mic" class="btn-control">🎤 Microfone On</button>
+            <button id="btn-toggle-cam" class="btn-control">📷 Câmera On</button>
           </div>
         </div>
 

@@ -6,6 +6,42 @@ let currentCall = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
 let arquivosTrocados = [];
+let micAtivo = true;
+let camAtiva = true;
+
+// MÁSCARAS E MÁXIMOS DE CAMPOS (CPF E TELEFONE)
+function aplicarMascaraCPF(e) {
+  let v = e.target.value.replace(/\D/g, '');
+  if (v.length > 11) v = v.substring(0, 11);
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  e.target.value = v;
+}
+
+function aplicarMascaraTelefone(e) {
+  let v = e.target.value.replace(/\D/g, '');
+  if (v.length > 11) v = v.substring(0, 11);
+  v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
+  v = v.replace(/(\d{5})(\d)/, '$1-$2');
+  e.target.value = v;
+}
+
+document.querySelectorAll('#pac-cpf, #med-login-cpf, #med-cad-cpf').forEach(input => {
+  if (input) input.addEventListener('input', aplicarMascaraCPF);
+});
+
+const pacTel = document.getElementById('pac-telefone');
+if (pacTel) pacTel.addEventListener('input', aplicarMascaraTelefone);
+
+// Sincronização Local de Sessão Médica
+function obterMedicoSalvoLocal() {
+  try { return JSON.parse(localStorage.getItem('medgo_medico_sessao')); } catch(e) { return null; }
+}
+function salvarMedicoLocal(medico) {
+  if (medico) localStorage.setItem('medgo_medico_sessao', JSON.stringify(medico));
+  else localStorage.removeItem('medgo_medico_sessao');
+}
 
 // Modo Claro / Escuro
 const btnTema = document.getElementById('btn-tema');
@@ -28,6 +64,28 @@ tabButtons.forEach(btn => {
     const tabId = `tab-${btn.getAttribute('data-tab')}`;
     document.getElementById(tabId).classList.remove('hidden');
   });
+});
+
+// Botões para Ativar/Desativar Microfone e Câmera
+const btnToggleMic = document.getElementById('btn-toggle-mic');
+const btnToggleCam = document.getElementById('btn-toggle-cam');
+
+btnToggleMic.addEventListener('click', () => {
+  if (localStream && localStream.getAudioTracks().length > 0) {
+    micAtivo = !micAtivo;
+    localStream.getAudioTracks()[0].enabled = micAtivo;
+    btnToggleMic.innerText = micAtivo ? '🎤 Microfone On' : '🎙️ Microfone Off';
+    btnToggleMic.classList.toggle('off', !micAtivo);
+  }
+});
+
+btnToggleCam.addEventListener('click', () => {
+  if (localStream && localStream.getVideoTracks().length > 0) {
+    camAtiva = !camAtiva;
+    localStream.getVideoTracks()[0].enabled = camAtiva;
+    btnToggleCam.innerText = camAtiva ? '📷 Câmera On' : '📷 Câmera Off';
+    btnToggleCam.classList.toggle('off', !camAtiva);
+  }
 });
 
 // Formulários Área Médica
@@ -68,7 +126,7 @@ linkVoltarLogin.addEventListener('click', (e) => {
   formLoginMedico.classList.remove('hidden');
 });
 
-// Cadastro de Médico
+// Cadastro Médico
 formCadastroMedico.addEventListener('submit', async (e) => {
   e.preventDefault();
   const dados = {
@@ -117,7 +175,7 @@ formRecuperarSenha.addEventListener('submit', async (e) => {
   }
 });
 
-// Login do Médico: Restringe abas
+// Login Médico
 formLoginMedico.addEventListener('submit', async (e) => {
   e.preventDefault();
   const cpf = document.getElementById('med-login-cpf').value;
@@ -132,20 +190,32 @@ formLoginMedico.addEventListener('submit', async (e) => {
 
   if (res.ok) {
     medSessaoAtiva = data.medico;
-    document.getElementById('saudacao-medico').innerText = `Dr(a). ${data.medico.nome}`;
-    document.getElementById('box-medico-auth').classList.add('hidden');
-    document.getElementById('dashboard-medico').classList.remove('hidden');
-
-    document.getElementById('nav-btn-paciente').classList.add('hidden');
-    document.getElementById('nav-btn-admin').classList.add('hidden');
+    salvarMedicoLocal(medSessaoAtiva);
+    ativarPainelMedico(medSessaoAtiva);
   } else {
     alert(data.error);
   }
 });
 
+function ativarPainelMedico(medico) {
+  document.getElementById('saudacao-medico').innerText = `Dr(a). ${medico.nome}`;
+  document.getElementById('box-medico-auth').classList.add('hidden');
+  document.getElementById('dashboard-medico').classList.remove('hidden');
+
+  document.getElementById('nav-btn-paciente').classList.add('hidden');
+  document.getElementById('nav-btn-admin').classList.add('hidden');
+}
+
+const medicoSalvo = obterMedicoSalvoLocal();
+if (medicoSalvo) {
+  medSessaoAtiva = medicoSalvo;
+  ativarPainelMedico(medicoSalvo);
+}
+
 // Logoff Médico
 document.getElementById('btn-logout-medico').addEventListener('click', () => {
   medSessaoAtiva = null;
+  salvarMedicoLocal(null);
   document.getElementById('dashboard-medico').classList.add('hidden');
   document.getElementById('box-medico-auth').classList.remove('hidden');
   formLoginMedico.reset();
@@ -176,7 +246,7 @@ document.getElementById('btn-logout-admin').addEventListener('click', () => {
   document.getElementById('form-login-admin').reset();
 });
 
-// Paciente entra na fila e esconde barra de abas
+// Paciente entra na fila
 document.getElementById('form-paciente').addEventListener('submit', (e) => {
   e.preventDefault();
   const dados = {
@@ -190,7 +260,6 @@ document.getElementById('form-paciente').addEventListener('submit', (e) => {
   socket.emit('entrar-fila', dados);
   document.getElementById('form-paciente-box').classList.add('hidden');
   document.getElementById('lobby-paciente').classList.remove('hidden');
-
   document.getElementById('main-nav-tabs').classList.add('hidden');
 });
 
@@ -214,7 +283,7 @@ socket.on('atualizar-fila', (fila) => {
   });
 });
 
-// Inicialização do PeerJS
+// Inicialização Estável do PeerJS
 function inicializarPeerJS() {
   if (peer) return;
 
@@ -245,7 +314,7 @@ function inicializarPeerJS() {
     try {
       if (!localStream) {
         localStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+          video: { width: { ideal: 640 }, height: { ideal: 640 } }, 
           audio: true 
         });
         const locVid = document.getElementById('local-video');
@@ -260,7 +329,7 @@ function inicializarPeerJS() {
         remoteVideo.play().catch(e => console.log('Erro remote play:', e));
       });
     } catch (err) {
-      console.error('Erro ao capturar mídia local no paciente:', err);
+      console.error('Erro ao capturar mídia no paciente:', err);
     }
   });
 }
@@ -279,6 +348,12 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
 socket.on('chamado-para-consulta', (dados) => {
   alert('O médico chamou para a consulta!');
   document.getElementById('tab-paciente').classList.add('hidden');
+  
+  if (dados.medicoInfo) {
+    document.getElementById('info-medico-paciente-banner').classList.remove('hidden');
+    document.getElementById('nome-medico-atendendo').innerText = `Em consulta com Dr(a). ${dados.medicoInfo.nome} (CRM: ${dados.medicoInfo.crm})`;
+  }
+  
   configurarInterfaceConsulta(false);
 });
 
@@ -294,7 +369,7 @@ function configurarInterfaceConsulta(isDoctor) {
   } else {
     document.getElementById('anamnese-box').classList.add('hidden');
     document.getElementById('area-upload-medico').classList.add('hidden');
-    document.getElementById('btn-encerrar-consulta').classList.add('hidden');
+    document.getElementById('btn-encerrar-consulta').classList.remove('hidden');
     document.getElementById('titulo-documentos').innerText = "Documentos Recebidos do Médico";
   }
 }
@@ -307,7 +382,7 @@ async function iniciarChamadaPeer(targetSocketId) {
   try {
     if (!localStream) {
       localStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+        video: { width: { ideal: 640 }, height: { ideal: 640 } }, 
         audio: true 
       });
       const locVid = document.getElementById('local-video');
@@ -362,11 +437,11 @@ function adicionarArquivoNaLista(data) {
 
 // Desconexão e Finalização
 socket.on('parceiro-desconectou', () => {
-  alert('A outra parte se desconectou. A consulta foi encerrada e o relatório final salvo automaticamente.');
+  alert('A outra parte se desconectou. A consulta foi encerrada e o relatório salvo automaticamente.');
   limparEVoltarLobby();
 });
 
-socket.on('consulta-encerrada-pelo-medico', () => {
+socket.on('consulta-encerrada', () => {
   alert('A consulta foi finalizada.');
   limparEVoltarLobby();
 });
@@ -383,6 +458,7 @@ function limparEVoltarLobby() {
 
   document.getElementById('texto-anamnese').value = '';
   document.getElementById('lista-arquivos').innerHTML = '<p class="empty-files">Nenhum documento anexado ainda.</p>';
+  document.getElementById('info-medico-paciente-banner').classList.add('hidden');
   arquivosTrocados = [];
   currentConsultation = null;
 
