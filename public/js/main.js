@@ -8,11 +8,13 @@ let medSessaoAtiva = null;
 let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
-let isMirrored = true;
 
-const pendingIceCandidates = [];
+// [CORREÇÃO] Candidatos ICE que chegam antes da conexão estar pronta ficam aqui (antes eram descartados)
+let candidatosPendentes = [];
+// [CORREÇÃO] Stream de reserva caso o navegador não entregue event.streams[0]
+let remoteStream = null;
 
-// Relays TURN de Alta Prioridade
+// Servidores TURN/STUN Profissionais e Abertos para Romper Firewalls Globais
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -33,11 +35,23 @@ const rtcConfig = {
       urls: 'turn:global.relay.metered.ca:443?transport=tcp',
       username: 'e823f6eb7e39ef695420e181',
       credential: 'K8a2x8C83/aJ9fGL'
+    },
+    // [CORREÇÃO] Entradas padrão da Metered que faltavam (TCP 80 e TURN sobre TLS 443),
+    // necessárias para redes corporativas/4G/Safari que bloqueiam UDP.
+    {
+      urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
+    },
+    {
+      urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
     }
   ]
 };
 
-// Máscaras de entrada
+// MÁSCARAS DE ENTRADA
 function aplicarMascaraCPF(e) {
   let v = e.target.value.replace(/\D/g, '');
   if (v.length > 11) v = v.substring(0, 11);
@@ -62,7 +76,7 @@ document.querySelectorAll('#pac-cpf, #med-login-cpf, #med-cad-cpf').forEach(inpu
 const pacTel = document.getElementById('pac-telefone');
 if (pacTel) pacTel.addEventListener('input', aplicarMascaraTelefone);
 
-// Sessão do Médico
+// Sessão Médica Local
 function obterMedicoSalvoLocal() {
   try { return JSON.parse(localStorage.getItem('medgo_medico_sessao')); } catch(e) { return null; }
 }
@@ -80,7 +94,7 @@ if (btnTema) {
   });
 }
 
-// Abas de Navegação
+// Controle de Navegação das Abas
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -95,29 +109,93 @@ tabButtons.forEach(btn => {
   });
 });
 
-// Acesso à Mídia
+// Captura de Mídia Adaptativa
 async function obterMidiaLocal() {
   if (localStream) return localStream;
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-      audio: true
-    });
-    const locVid = document.getElementById('local-video');
-    if (locVid) {
-      locVid.srcObject = localStream;
-      locVid.muted = true;
-      locVid.play().catch(e => console.log('Play local:', e));
-    }
-    return localStream;
-  } catch (err) {
-    alert('Por favor, autorize a Câmera e o Microfone para iniciar.');
-    console.error('Erro de mídia:', err);
+
+  // [CORREÇÃO] Navegadores sem suporte / página fora de HTTPS não têm navigator.mediaDevices
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Este navegador não permite acessar câmera e microfone. Abra o site por HTTPS (ou localhost) em um navegador atualizado.');
     return null;
+  }
+
+  // [CORREÇÃO] 1ª tentativa = configuração original; 2ª = simples (alguns Safari/Firefox/câmeras
+  // rejeitam "min" com OverconstrainedError)
+  const tentativas = [
+    {
+      video: {
+        width: { min: 320, ideal: 640 },
+        height: { min: 240, ideal: 480 },
+        facingMode: "user"
+      },
+      audio: true
+    },
+    { video: true, audio: true }
+  ];
+
+  let ultimoErro = null;
+  for (const constraints of tentativas) {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      break;
+    } catch (err) {
+      ultimoErro = err;
+      if (err && err.name === 'NotAllowedError') break; // permissão negada: não adianta insistir
+    }
+  }
+
+  if (!localStream) {
+    alert('Aviso: Permita o acesso à Câmera e ao Microfone nas configurações do navegador.');
+    console.error('Erro de mídia:', ultimoErro);
+    return null;
+  }
+
+  const locVid = document.getElementById('local-video');
+  if (locVid) {
+    locVid.srcObject = localStream;
+    locVid.muted = true;
+    locVid.play().catch(e => console.log('Erro play local:', e));
+  }
+  return localStream;
+}
+
+// [CORREÇÃO] Tocar o vídeo remoto; se o navegador bloquear autoplay com áudio (Safari/iOS),
+// mostra um botão para o usuário tocar uma vez.
+function tocarVideoRemoto(video) {
+  const p = video.play();
+  if (p && p.catch) {
+    p.catch(err => {
+      console.log('Erro play remoto:', err);
+      if (err && err.name === 'NotAllowedError') mostrarBotaoAtivarMidia(video);
+    });
   }
 }
 
-// WebRTC Conexão
+function mostrarBotaoAtivarMidia(video) {
+  if (document.getElementById('btn-ativar-midia')) return;
+  const box = video.parentElement;
+  if (!box) return;
+  const btn = document.createElement('button');
+  btn.id = 'btn-ativar-midia';
+  btn.type = 'button';
+  btn.textContent = '▶ Toque para ativar vídeo e áudio';
+  btn.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; padding:12px 18px; border:none; border-radius:8px; background:#8b5cf6; color:#fff; font-weight:600; cursor:pointer;';
+  btn.addEventListener('click', () => {
+    video.play().then(() => btn.remove()).catch(e => console.log('Erro play remoto:', e));
+  });
+  box.appendChild(btn);
+}
+
+// [CORREÇÃO] Aplica os candidatos ICE guardados assim que a descrição remota existe
+async function aplicarCandidatosPendentes() {
+  if (!peerConnection || !peerConnection.remoteDescription) return;
+  const lista = candidatosPendentes;
+  candidatosPendentes = [];
+  for (const c of lista) {
+    try { await peerConnection.addIceCandidate(new RTCIceCandidate(c)); } catch (e) { console.warn('Erro ao adicionar ICE pendente:', e); }
+  }
+}
+
 function criarPeerConnection(outroSocketId) {
   if (peerConnection) peerConnection.close();
   peerConnection = new RTCPeerConnection(rtcConfig);
@@ -128,12 +206,27 @@ function criarPeerConnection(outroSocketId) {
     });
   }
 
+  remoteStream = null;
+
   peerConnection.ontrack = (event) => {
     const remoteVideo = document.getElementById('remote-video');
-    if (remoteVideo && event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-      remoteVideo.play().catch(e => console.log('Play remoto:', e));
+    if (!remoteVideo) return;
+
+    // [CORREÇÃO] Se o navegador não entregar o stream, monta um com a track recebida
+    let stream = event.streams && event.streams[0];
+    if (!stream) {
+      if (!remoteStream) remoteStream = new MediaStream();
+      remoteStream.addTrack(event.track);
+      stream = remoteStream;
     }
+
+    if (remoteVideo.srcObject !== stream) remoteVideo.srcObject = stream;
+    tocarVideoRemoto(remoteVideo);
+  };
+
+  // [CORREÇÃO] Log de diagnóstico (F12 → Console)
+  peerConnection.oniceconnectionstatechange = () => {
+    console.log('ICE state:', peerConnection && peerConnection.iceConnectionState);
   };
 
   peerConnection.onicecandidate = (event) => {
@@ -145,15 +238,17 @@ function criarPeerConnection(outroSocketId) {
 
 socket.on('webrtc-offer', async (data) => {
   targetSocketId = data.sender;
+
+  // [CORREÇÃO] Limpa restos de chamada anterior ANTES de qualquer await,
+  // para não apagar os candidatos ICE que chegarem enquanto a câmera é liberada.
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  candidatosPendentes = [];
+
   await obterMidiaLocal();
   criarPeerConnection(targetSocketId);
   await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+  await aplicarCandidatosPendentes(); // [CORREÇÃO] aplica os candidatos que chegaram cedo demais
   
-  while (pendingIceCandidates.length) {
-    const candidate = pendingIceCandidates.shift();
-    await peerConnection.addIceCandidate(candidate);
-  }
-
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
   
@@ -163,62 +258,22 @@ socket.on('webrtc-offer', async (data) => {
 socket.on('webrtc-answer', async (data) => {
   if (peerConnection) {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    while (pendingIceCandidates.length) {
-      const candidate = pendingIceCandidates.shift();
-      await peerConnection.addIceCandidate(candidate);
-    }
+    await aplicarCandidatosPendentes(); // [CORREÇÃO]
   }
 });
 
 socket.on('webrtc-ice-candidate', async (data) => {
-  if (data.candidate) {
-    const candidate = new RTCIceCandidate(data.candidate);
-    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-      try { await peerConnection.addIceCandidate(candidate); } catch (e) {}
-    } else {
-      pendingIceCandidates.push(candidate);
-    }
+  if (!data.candidate) return;
+  // [CORREÇÃO] Antes: se a conexão ainda não existia ou não tinha descrição remota,
+  // o candidato era descartado em silêncio. Agora fica na fila até poder ser aplicado.
+  if (peerConnection && peerConnection.remoteDescription) {
+    try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn('Erro ao adicionar ICE:', e); }
+  } else {
+    candidatosPendentes.push(data.candidate);
   }
 });
 
-// Ações dos Botões de Mídia
-const btnToggleMic = document.getElementById('btn-toggle-mic');
-const btnToggleCam = document.getElementById('btn-toggle-cam');
-const btnMirrorCam = document.getElementById('btn-mirror-cam');
-
-if (btnToggleMic) {
-  btnToggleMic.addEventListener('click', () => {
-    if (localStream && localStream.getAudioTracks().length > 0) {
-      micAtivo = !micAtivo;
-      localStream.getAudioTracks()[0].enabled = micAtivo;
-      btnToggleMic.innerText = micAtivo ? '🎤' : '🎙️';
-      btnToggleMic.classList.toggle('off', !micAtivo);
-    }
-  });
-}
-
-if (btnToggleCam) {
-  btnToggleCam.addEventListener('click', () => {
-    if (localStream && localStream.getVideoTracks().length > 0) {
-      camAtiva = !camAtiva;
-      localStream.getVideoTracks()[0].enabled = camAtiva;
-      btnToggleCam.innerText = camAtiva ? '📷' : '🚫';
-      btnToggleCam.classList.toggle('off', !camAtiva);
-    }
-  });
-}
-
-if (btnMirrorCam) {
-  btnMirrorCam.addEventListener('click', () => {
-    isMirrored = !isMirrored;
-    const locVid = document.getElementById('local-video');
-    if (locVid) {
-      locVid.classList.toggle('mirrored', isMirrored);
-    }
-  });
-}
-
-// Lista Lateral de Médicos
+// Lista de Médicos na Sidebar
 socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   const containerPaciente = document.getElementById('lista-medicos-status-paciente');
   if (containerPaciente) {
@@ -239,12 +294,12 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   }
 });
 
-// Admin Dashboard
+// Atualização Completa do Admin em Tempo Real
 socket.on('atualizar-admin-dashboard', (data) => {
   renderAdminDashboard(data);
 });
 
-// Formulário de Cadastro Médico
+// Cadastro de Médico
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
 if (formCadastroMedico) {
   formCadastroMedico.addEventListener('submit', async (e) => {
@@ -302,6 +357,7 @@ function ativarPainelMedico(medico) {
   document.getElementById('dashboard-medico').classList.remove('hidden');
 }
 
+// Alternar entre Login e Cadastro
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 
@@ -321,7 +377,7 @@ if (btnMedLoginView && btnMedCadView) {
   });
 }
 
-// Logoff
+// Logoff Médico
 const btnLogoutMed = document.getElementById('btn-logout-medico');
 if (btnLogoutMed) {
   btnLogoutMed.addEventListener('click', () => {
@@ -333,7 +389,7 @@ if (btnLogoutMed) {
   });
 }
 
-// Admin
+// Login Admin
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
   formAdmin.addEventListener('submit', (e) => {
@@ -359,7 +415,7 @@ if (btnLogoutAdmin) {
   });
 }
 
-// Entrar na Fila
+// Fila do Paciente
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -399,6 +455,7 @@ socket.on('atualizar-fila', (fila) => {
 
 window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   targetSocketId = pacienteSocketId;
+  candidatosPendentes = []; // [CORREÇÃO] começa a chamada sem sobras da anterior
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
   socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
@@ -406,7 +463,8 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   await obterMidiaLocal();
   criarPeerConnection(targetSocketId);
   
-  const offer = await peerConnection.createOffer();
+  // [CORREÇÃO] Garante que a offer peça áudio/vídeo do paciente mesmo se a câmera local falhar
+  const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
   await peerConnection.setLocalDescription(offer);
   
   socket.emit('webrtc-offer', { target: targetSocketId, sdp: offer });
@@ -440,6 +498,7 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
+// Finalização
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou.');
   limparEVoltarLobby();
@@ -455,6 +514,13 @@ function limparEVoltarLobby() {
     peerConnection.close();
     peerConnection = null;
   }
+  // [CORREÇÃO] Limpa vídeo remoto, botão de ativação e fila de candidatos da chamada encerrada
+  candidatosPendentes = [];
+  remoteStream = null;
+  const remotoVid = document.getElementById('remote-video');
+  if (remotoVid) remotoVid.srcObject = null;
+  const btnAtivar = document.getElementById('btn-ativar-midia');
+  if (btnAtivar) btnAtivar.remove();
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
@@ -488,7 +554,7 @@ if (btnEncerrar) {
   });
 }
 
-// Painel Admin
+// Painel Admin & Exclusão
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
