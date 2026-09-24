@@ -6,8 +6,10 @@ let currentCall = null;
 let targetSocketId = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
-let peerRoomId = null;
+let arquivosTrocados = [];
+let remoteStream = null;
 
+// Servidores STUN públicos do Google
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -31,6 +33,60 @@ function switchTab(tabName) {
   });
 }
 
+// Inicializa o PeerJS na Nuvem Oficial (evita erro 502/400 do Render)
+function iniciarPeer() {
+  if (peer && !peer.destroyed) return peer;
+
+  // Limpa o socket.id de caracteres especiais se houver
+  const peerIdClean = socket.id ? socket.id.replace(/[^a-zA-Z0-9]/g, '') : null;
+  if (!peerIdClean) return null;
+
+  peer = new Peer(peerIdClean, {
+    host: '0.peerjs.com',
+    port: 443,
+    secure: true,
+    config: rtcConfig
+  });
+
+  peer.on('call', async (call) => {
+    const stream = await obterMidiaLocal();
+    if (stream) {
+      call.answer(stream);
+      wireCall(call);
+    }
+  });
+
+  peer.on('error', (err) => {
+    console.warn('Aviso PeerJS:', err.type || err);
+  });
+
+  return peer;
+}
+
+// Vincula a chamada com verificação de segurança contra TypeError
+function wireCall(call) {
+  if (!call) return;
+  currentCall = call;
+
+  // Garante a leitura do ID sem quebrar a execução se o objeto mudar
+  targetSocketId = call.peer || call.provider?.id || targetSocketId;
+
+  call.on('stream', (stream) => {
+    remoteStream = stream;
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo) {
+      remoteVideo.srcObject = stream;
+      remoteVideo.play().catch(e => console.warn('Erro play remoto:', e));
+    }
+  });
+
+  call.on('close', () => { currentCall = null; });
+  call.on('error', (e) => console.warn('Erro na chamada:', e));
+}
+
+socket.on('connect', () => { iniciarPeer(); });
+if (socket.connected) iniciarPeer();
+
 async function obterMidiaLocal() {
   if (localStream) return localStream;
 
@@ -44,72 +100,12 @@ async function obterMidiaLocal() {
     }
     return localStream;
   } catch (err) {
-    alert('Permita o acesso à câmera e ao microfone.');
+    alert('Permita o acesso à câmera e microfone.');
     return null;
   }
 }
 
-function inicializarPeerParaConsulta(roomId, isCaller) {
-  if (peer && !peer.destroyed) peer.destroy();
-
-  const peerId = isCaller ? `${roomId}-doc` : `${roomId}-pat`;
-  
-  peer = new Peer(peerId, {
-    host: '0.peerjs.com',
-    port: 443,
-    secure: true,
-    config: rtcConfig
-  });
-
-  const statusLog = document.getElementById('webrtc-status-log');
-
-  peer.on('open', async (id) => {
-    if (statusLog) statusLog.innerText = "Aguardando sinalização...";
-
-    const stream = await obterMidiaLocal();
-    if (!stream) return;
-
-    if (!isCaller) {
-      // Paciente chama o médico na sala
-      const docPeerId = `${roomId}-doc`;
-      if (statusLog) statusLog.innerText = "Conectando ao Médico...";
-
-      const call = peer.call(docPeerId, stream);
-      wireCall(call);
-    }
-  });
-
-  peer.on('call', async (call) => {
-    const stream = await obterMidiaLocal();
-    call.answer(stream);
-    wireCall(call);
-  });
-
-  peer.on('error', (err) => {
-    console.warn('Erro PeerJS:', err);
-    if (statusLog) statusLog.innerText = "Reconectando vídeo...";
-  });
-}
-
-function wireCall(call) {
-  currentCall = call;
-
-  call.on('stream', (remoteStream) => {
-    const remoteVideo = document.getElementById('remote-video');
-    const statusLog = document.getElementById('webrtc-status-log');
-
-    if (remoteVideo) {
-      remoteVideo.srcObject = remoteStream;
-      remoteVideo.play().catch(e => console.warn('Erro play remoto:', e));
-    }
-
-    if (statusLog) statusLog.innerText = "🟢 Vídeo e Áudio Conectados";
-  });
-
-  call.on('close', () => { currentCall = null; });
-}
-
-// TOGGLE LOGIN/CADASTRO MÉDICO
+// Alternar visão Login / Cadastro Médico
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 const formLoginMedico = document.getElementById('form-login-medico');
@@ -208,7 +204,7 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   renderMedicosAdmin(listaMedicos);
 });
 
-// FILA
+// Fila de Espera Paciente
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -248,25 +244,27 @@ socket.on('atualizar-fila', (fila) => {
 
 window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   targetSocketId = pacienteSocketId;
-  peerRoomId = `medgo-room-${Date.now()}`;
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
 
-  socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva, roomId: peerRoomId });
+  socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
 
-  await obterMidiaLocal();
-  inicializarPeerParaConsulta(peerRoomId, true);
+  const stream = await obterMidiaLocal();
+  const p = iniciarPeer();
+
+  if (p && stream) {
+    const targetClean = pacienteSocketId.replace(/[^a-zA-Z0-9]/g, '');
+    const call = p.call(targetClean, stream);
+    wireCall(call);
+  }
 };
 
 socket.on('chamado-para-consulta', async (dados) => {
   targetSocketId = dados.medicoSocketId || dados.sender;
-  peerRoomId = dados.roomId;
-
   alert('O médico chamou para a consulta!');
   configurarInterfaceConsulta(false);
-
   await obterMidiaLocal();
-  inicializarPeerParaConsulta(peerRoomId, false);
+  iniciarPeer();
 });
 
 function configurarInterfaceConsulta(isDoctor) {
