@@ -9,19 +9,16 @@ let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
 
-// Candidatos ICE que chegam antes da conexão estar pronta
 let candidatosPendentes = [];
-// Stream de reserva caso o navegador não entregue event.streams[0]
 let remoteStream = null;
 
-// Servidores TURN/STUN Profissionais e Abertos para Romper Firewalls Globais e Conexões Internacionais
+// Servidores TURN/STUN para Conexões Internacionais
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
-    // OpenRelay TURN (Sem limite regional)
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelay',
@@ -37,7 +34,6 @@ const rtcConfig = {
       username: 'openrelay',
       credential: 'openrelay'
     },
-    // Metered TURN (Fallback TCP/UDP)
     {
       urls: 'turn:global.relay.metered.ca:80',
       username: 'e823f6eb7e39ef695420e181',
@@ -119,17 +115,13 @@ async function obterMidiaLocal() {
   if (localStream) return localStream;
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert('Este navegador não permite acessar câmera e microfone. Abra o site por HTTPS (ou localhost) em um navegador atualizado.');
+    alert('Este navegador não permite acessar câmera e microfone. Abra o site por HTTPS (ou localhost).');
     return null;
   }
 
   const tentativas = [
     {
-      video: {
-        width: { min: 320, ideal: 640 },
-        height: { min: 240, ideal: 480 },
-        facingMode: "user"
-      },
+      video: { width: { min: 320, ideal: 640 }, height: { min: 240, ideal: 480 }, facingMode: "user" },
       audio: true
     },
     { video: true, audio: true }
@@ -162,7 +154,6 @@ async function obterMidiaLocal() {
   return localStream;
 }
 
-// Tocar o vídeo remoto (Tratamento de Autoplay Safari/iOS)
 function tocarVideoRemoto(video) {
   video.playsInline = true;
   const p = video.play();
@@ -189,7 +180,6 @@ function mostrarBotaoAtivarMidia(video) {
   box.appendChild(btn);
 }
 
-// Aplica candidatos ICE guardados após setRemoteDescription
 async function aplicarCandidatosPendentes() {
   if (!peerConnection || !peerConnection.remoteDescription) return;
   const lista = candidatosPendentes;
@@ -243,7 +233,7 @@ socket.on('webrtc-offer', async (data) => {
   if (peerConnection) { peerConnection.close(); peerConnection = null; }
   candidatosPendentes = [];
 
-  await obterMidiaLocal();
+  await obtainingMidiaLocal();
   criarPeerConnection(targetSocketId);
   await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
   await aplicarCandidatosPendentes();
@@ -270,7 +260,7 @@ socket.on('webrtc-ice-candidate', async (data) => {
   }
 });
 
-// Lista de Médicos na Sidebar
+// Lista de Médicos na Sidebar Lateral
 socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   const containerPaciente = document.getElementById('lista-medicos-status-paciente');
   if (containerPaciente) {
@@ -289,9 +279,12 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
       `).join('');
     }
   }
+
+  // Atualiza também a tabela de médicos no painel Admin se estiver aberto
+  renderMedicosAdmin(listaMedicos);
 });
 
-// Atualização do Admin
+// Atualização Geral do Admin em Tempo Real
 socket.on('atualizar-admin-dashboard', (data) => {
   renderAdminDashboard(data);
 });
@@ -354,7 +347,6 @@ function ativarPainelMedico(medico) {
   document.getElementById('dashboard-medico').classList.remove('hidden');
 }
 
-// Alternar entre Login e Cadastro
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 
@@ -466,7 +458,6 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   socket.emit('webrtc-offer', { target: targetSocketId, sdp: offer });
 };
 
-// Captura e atribuição obrigatória do Socket ID do médico no lado do Paciente
 socket.on('chamado-para-consulta', (dados) => {
   targetSocketId = dados.medicoSocketId || dados.sender;
   alert('O médico chamou para a consulta!');
@@ -496,7 +487,7 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Finalização da Consulta
+// Finalização
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou.');
   limparEVoltarLobby();
@@ -555,7 +546,10 @@ if (btnEncerrar) {
   });
 }
 
-// Painel Admin & Exclusão
+// ==========================================
+// PAINEL ADMIN: APROVAR, NEGAR, BLOQUEAR E EXCLUIR
+// ==========================================
+
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
@@ -583,11 +577,11 @@ function renderMedicosAdmin(medicos) {
   }
 
   container.innerHTML = medicos.map(m => `
-    <div class="item-row" style="flex-wrap:wrap; gap:8px;">
+    <div class="item-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:10px; background:var(--bg-color); border-radius:8px;">
       <div>
-        <strong>${m.nome}</strong> (CRM: ${m.crm}) - Status: <em>${m.statusCadastro.toUpperCase()}</em>
+        <strong>${m.nome}</strong> (CRM: ${m.crm}) - Status: <em style="color:var(--cyan);">${m.statusCadastro.toUpperCase()}</em>
       </div>
-      <div>
+      <div style="display:flex; gap:6px;">
         ${m.statusCadastro === 'pendente' ? `
           <button class="btn-small btn-success" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Aprovar</button>
           <button class="btn-small btn-warn" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Negar</button>
@@ -613,7 +607,7 @@ function renderPacientesAdmin(pacientes) {
   }
 
   container.innerHTML = pacientes.map(p => `
-    <div class="item-row">
+    <div class="item-row" style="display:flex; justify-content:space-between; margin-bottom:6px; padding:8px; background:var(--bg-color); border-radius:6px;">
       <div>
         <strong>${p.nome}</strong> (CPF: ${p.cpf}) | 📞 ${p.telefone}
       </div>
@@ -632,7 +626,7 @@ function renderLogsAdmin(logs) {
     return;
   }
   lista.innerHTML = logs.map(l => `
-    <li class="item-row">
+    <li class="item-row" style="display:flex; justify-content:space-between; margin-bottom:6px; padding:8px; background:var(--bg-color); border-radius:6px;">
       <span><strong>${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
       <a href="${l.zipUrl}" class="btn-secondary" style="width:auto; text-decoration:none; padding:4px 10px; font-size:0.8rem;">📦 Baixar .ZIP</a>
     </li>
@@ -645,6 +639,7 @@ window.alterarStatusMedico = async (medicoId, novoStatus) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ medicoId, novoStatus })
   });
+  carregarDadosAdmin();
 };
 
 window.excluirMedicoAdmin = async (medicoId) => {
@@ -654,13 +649,11 @@ window.excluirMedicoAdmin = async (medicoId) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ medicoId })
   });
+  carregarDadosAdmin();
 };
 
-// ==========================================
-// UPLOAD E RECEBIMENTO DE DOCUMENTOS (SISTEMA UNIFICADO)
-// ==========================================
-
-const inputArquivo = document.getElementById('input-arquivo') || document.getElementById('input-arquivo-medico');
+// UPLOAD DE DOCUMENTOS
+const inputArquivo = document.getElementById('input-arquivo');
 if (inputArquivo) {
   inputArquivo.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -704,7 +697,6 @@ if (inputArquivo) {
   });
 }
 
-// Escuta a chegada de ficheiros vindos do outro participante
 socket.on('receber-arquivo-medico', (fileData) => {
   arquivosTrocados.push(fileData);
   adicionarArquivoNaLista(fileData);
