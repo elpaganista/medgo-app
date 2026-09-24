@@ -7,6 +7,7 @@ let targetSocketId = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
 let remoteStream = null;
+let currentRoomId = null;
 
 // Configuração STUN e TURN (OpenRelay) para ultrapassar Firewalls e CGNAT
 const rtcConfig = {
@@ -82,38 +83,37 @@ async function obterMidiaLocal() {
   }
 }
 
-// Criar e ligar a instância PeerJS de forma sincronizada
+// Criar e ligar a instância PeerJS com ID dinâmico para evitar colisão de canal
 function conectarPeerSincronizado(roomId, isDoctor) {
-  if (peer && !peer.destroyed) peer.destroy();
+  if (peer) {
+    try { peer.destroy(); } catch(e) {}
+    peer = null;
+  }
 
-  const peerId = isDoctor ? `${roomId}-doc` : `${roomId}-pat`;
+  currentRoomId = roomId;
   const statusLog = document.getElementById('webrtc-status-log');
 
-  peer = new Peer(peerId, {
+  // Peer sem ID fixo (gera hash único nativo na nuvem)
+  peer = new Peer({
     host: '0.peerjs.com',
     port: 443,
     secure: true,
     config: rtcConfig
   });
 
-  peer.on('open', async () => {
-    if (statusLog) statusLog.innerText = "Procurando sinalização de vídeo...";
-    const stream = await obterMidiaLocal();
-    if (!stream) return;
+  peer.on('open', async (myPeerId) => {
+    if (statusLog) statusLog.innerText = "Aguardando canal de vídeo...";
 
-    if (!isDoctor) {
-      // O paciente disca para o médico da sala
-      if (statusLog) statusLog.innerText = "Conectando ao Médico...";
-      const docPeerId = `${roomId}-doc`;
-      const call = peer.call(docPeerId, stream);
-      wireCall(call);
-    }
+    // Registra no socket a entrada na sala e passa o Peer ID dinâmico gerado
+    socket.emit('entrar-sala-consulta', { roomId, peerId: myPeerId, isDoctor });
   });
 
   peer.on('call', async (call) => {
     const stream = await obterMidiaLocal();
-    call.answer(stream);
-    wireCall(call);
+    if (stream) {
+      call.answer(stream);
+      wireCall(call);
+    }
   });
 
   peer.on('error', (err) => {
@@ -121,6 +121,20 @@ function conectarPeerSincronizado(roomId, isDoctor) {
     if (statusLog) statusLog.innerText = "Erro na reconexão de vídeo.";
   });
 }
+
+// Disca para o parceiro assim que o socket avisa que o outro Peer ID se conectou
+socket.on('peer-parceiro-conectado', async (data) => {
+  const { peerId } = data;
+  const statusLog = document.getElementById('webrtc-status-log');
+  
+  if (statusLog) statusLog.innerText = "Conectando vídeo com participante...";
+
+  const stream = await obterMidiaLocal();
+  if (peer && stream && peerId) {
+    const call = peer.call(peerId, stream);
+    wireCall(call);
+  }
+});
 
 function wireCall(call) {
   if (!call) return;

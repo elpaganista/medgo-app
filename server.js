@@ -270,6 +270,7 @@ io.on('connection', (socket) => {
     const sessionId = Date.now().toString();
     const dadosConsulta = {
       sessionId,
+      roomId,
       medicoSocketId: socket.id,
       pacienteSocketId,
       medico: medicoInfo || { nome: 'Médico MedGo', crm: 'N/A' },
@@ -281,6 +282,9 @@ io.on('connection', (socket) => {
     consultasAtivas.set(socket.id, dadosConsulta);
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
+    // Adiciona ambos os sockets na sala única para troca de sinalização
+    socket.join(roomId);
+
     io.emit('atualizar-fila', filaPacientes);
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
@@ -289,6 +293,14 @@ io.on('connection', (socket) => {
       roomId,
       medicoInfo: dadosConsulta.medico
     });
+  });
+
+  socket.on('entrar-sala-consulta', (data) => {
+    const { roomId, peerId } = data;
+    socket.join(roomId);
+
+    // Transmite para os outros membros da sala o Peer ID dinâmico recém-gerado
+    socket.to(roomId).emit('peer-parceiro-conectado', { peerId });
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
