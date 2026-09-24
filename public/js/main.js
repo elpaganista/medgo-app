@@ -68,7 +68,7 @@ async function obterMidiaLocal() {
 // INICIALIZA A CONEXÃO WEBRTC NATIVA VIA SOCKET.IO
 async function iniciarWebRTCNativo(roomId, isDoctor) {
   if (rtcPeer) {
-    rtcPeer.close();
+    try { rtcPeer.close(); } catch(e){}
     rtcPeer = null;
   }
 
@@ -92,20 +92,29 @@ async function iniciarWebRTCNativo(roomId, isDoctor) {
   };
 
   rtcPeer.onicecandidate = (event) => {
-    if (event.candidate) {
+    if (event.candidate && targetSocketId) {
       socket.emit('webrtc-candidate', { candidate: event.candidate, targetId: targetSocketId });
     }
   };
 
+  // Entra na sala no servidor
   socket.emit('entrar-sala-consulta', { roomId, isDoctor });
+
+  // Se for o paciente, notifica que já está pronto para receber a Oferta de vídeo
+  if (!isDoctor) {
+    setTimeout(() => {
+      socket.emit('paciente-pronto-para-oferta', { roomId });
+    }, 500);
+  }
 }
 
-// SINALIZAÇÃO WEBRTC VIA SOCKET.IO
-socket.on('usuario-entrou-na-sala', async (data) => {
-  targetSocketId = data.socketId;
+// Quando o paciente avisa que está pronto, o Médico gera a Oferta
+socket.on('iniciar-criacao-oferta', async (data) => {
+  if (data.pacienteSocketId) {
+    targetSocketId = data.pacienteSocketId;
+  }
 
-  // O Médico cria a proposta (Offer)
-  if (data.isDoctor) {
+  if (rtcPeer && rtcPeer.signalingState !== 'closed') {
     const offer = await rtcPeer.createOffer();
     await rtcPeer.setLocalDescription(offer);
     socket.emit('webrtc-offer', { offer, targetId: targetSocketId });
@@ -114,8 +123,9 @@ socket.on('usuario-entrou-na-sala', async (data) => {
 
 socket.on('webrtc-offer', async (data) => {
   targetSocketId = data.senderId;
+  if (!rtcPeer) return;
+
   await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.offer));
-  
   const answer = await rtcPeer.createAnswer();
   await rtcPeer.setLocalDescription(answer);
   
@@ -123,12 +133,14 @@ socket.on('webrtc-offer', async (data) => {
 });
 
 socket.on('webrtc-answer', async (data) => {
-  await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.answer));
+  if (rtcPeer && rtcPeer.signalingState !== 'closed') {
+    await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.answer));
+  }
 });
 
 socket.on('webrtc-candidate', async (data) => {
   try {
-    if (data.candidate) {
+    if (rtcPeer && data.candidate && rtcPeer.remoteDescription) {
       await rtcPeer.addIceCandidate(new RTCIceCandidate(data.candidate));
     }
   } catch (e) {
