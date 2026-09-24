@@ -20,7 +20,7 @@
     </div>
   </header>
 
-  <!-- Navegação por Abas Principais (Sempre Visível no Topo) -->
+  <!-- Navegação por Abas Principais -->
   <nav class="tabs-nav" id="main-nav-tabs">
     <button class="tab-btn active" data-tab="paciente" id="nav-btn-paciente">Área do Paciente</button>
     <button class="tab-btn" data-tab="medico" id="nav-btn-medico">Área Médica</button>
@@ -29,11 +29,10 @@
 
   <main class="container">
     
-    <!-- 1. ABA PACIENTE COM SIDEBAR DE MÉDICOS -->
+    <!-- 1. ABA PACIENTE -->
     <section id="tab-paciente" class="tab-content active">
       <div class="paciente-grid">
         
-        <!-- Sidebar Lateral com Médicos Cadastrados e Status Online -->
         <aside class="sidebar-card">
           <h3 style="font-size:1rem; margin-bottom:12px; color:var(--primary);">🩺 Corpo Médico:</h3>
           <div id="lista-medicos-status-paciente">
@@ -41,7 +40,6 @@
           </div>
         </aside>
 
-        <!-- Formulário de Entrada do Paciente -->
         <div class="card" id="form-paciente-box" style="margin:0;">
           <div class="card-header">
             <h2>Atendimento MedGo</h2>
@@ -92,7 +90,6 @@
           <button type="button" id="btn-med-cad-view" class="sub-tab-btn">Novo Cadastro</button>
         </div>
 
-        <!-- Form Login Médico -->
         <form id="form-login-medico">
           <h3>Acesso Médico</h3>
           <div class="input-group">
@@ -106,7 +103,6 @@
           <button type="submit" class="btn-primary">Acessar Painel</button>
         </form>
 
-        <!-- Form Cadastro Médico (Totalmente Corrigido) -->
         <form id="form-cadastro-medico" class="hidden">
           <h3>Cadastro de Profissional</h3>
           <div class="input-group">
@@ -133,7 +129,6 @@
         </form>
       </div>
 
-      <!-- Dashboard da Fila para o Médico -->
       <div class="card hidden" id="dashboard-medico">
         <div class="dash-header flex-between">
           <div>
@@ -165,7 +160,6 @@
         </form>
       </div>
 
-      <!-- Dashboard Admin Geral -->
       <div class="card hidden" id="dashboard-admin">
         <div class="dash-header flex-between">
           <h2>Gestão Geral MedGo</h2>
@@ -227,19 +221,23 @@
       <div class="grid-consulta">
         
         <div class="video-container">
+          <!-- Vídeo Remoto -->
           <div class="video-box main-video">
             <span class="badge" id="label-remote-video">Vídeo Remoto</span>
             <video id="remote-video" autoplay playsinline webkit-playsinline></video>
           </div>
 
+          <!-- Vídeo Local -->
           <div class="video-box sub-video">
             <span class="badge" id="label-local-video">Seu Vídeo</span>
-            <video id="local-video" autoplay muted playsinline webkit-playsinline></video>
+            <video id="local-video" class="mirrored" autoplay muted playsinline webkit-playsinline></video>
           </div>
 
+          <!-- Controles de Mídia em Ícones -->
           <div class="video-controls">
-            <button id="btn-toggle-mic" class="btn-control">🎤 Microfone On</button>
-            <button id="btn-toggle-cam" class="btn-control">📷 Câmera On</button>
+            <button id="btn-toggle-mic" class="btn-icon-control" title="Ligar/Desligar Microfone">🎤</button>
+            <button id="btn-toggle-cam" class="btn-icon-control" title="Ligar/Desligar Câmera">📷</button>
+            <button id="btn-mirror-cam" class="btn-icon-control" title="Espelhar Imagem da Câmera">🪞</button>
           </div>
         </div>
 

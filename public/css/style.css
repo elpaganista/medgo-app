@@ -125,7 +125,6 @@ body {
   margin: 2rem auto;
 }
 
-/* Layout com Lateral (Sidebar) do Paciente */
 .paciente-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -265,29 +264,45 @@ textarea {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.3s ease;
 }
 
+.video-box video.mirrored {
+  transform: scaleX(-1);
+}
+
+/* Botões Circulares Apenas com Ícones */
 .video-controls {
   display: flex;
   justify-content: center;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 16px;
+  margin-top: 10px;
 }
 
-.btn-control {
-  background: var(--card-bg);
+.btn-icon-control {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
   border: 1px solid var(--border);
+  background: var(--card-bg);
   color: var(--text-color);
-  padding: 10px 16px;
-  border-radius: 20px;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-.btn-control.off {
+.btn-icon-control:hover {
+  transform: scale(1.08);
+}
+
+.btn-icon-control.off {
   background: var(--danger);
   color: white;
+  border-color: var(--danger);
 }
 
 .badge {
