@@ -12,15 +12,8 @@ process.env.TZ = 'America/Fortaleza';
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" },
-  pingTimeout: 60000,
-  pingInterval: 25000
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-// Servidor de sinalização de vídeo (PeerJS), usado pelo front-end para
-// estabelecer as chamadas médico <-> paciente via WebRTC.
-// Roda no mesmo servidor HTTP/porta do resto do app, sem infra extra.
 const peerServer = ExpressPeerServer(server, { path: '/' });
 app.use('/peerjs', peerServer);
 
@@ -98,45 +91,30 @@ function obterMedicosComStatus() {
   }));
 }
 
-// Upload de Arquivos
+// Upload
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
-  res.json({ 
-    filename: req.file.filename, 
-    originalname: req.file.originalname,
-    path: `/uploads/${req.file.filename}` 
-  });
+  res.json({ filename: req.file.filename, originalname: req.file.originalname, path: `/uploads/${req.file.filename}` });
 });
 
-// Cadastro de Médico
+// Cadastro
 app.post('/api/medico/cadastro', (req, res) => {
-  try {
-    const { nome, cpf, email, crm, senha } = req.body;
-    if (!nome || !cpf || !crm || !senha) {
-      return res.status(400).json({ error: 'Preencha todos os campos obrigatórios.' });
-    }
-    
-    if (medicos.find(m => m.cpf === cpf)) {
-      return res.status(400).json({ error: 'Este CPF já está cadastrado.' });
-    }
+  const { nome, cpf, email, crm, senha } = req.body;
+  if (!nome || !cpf || !crm || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
+  if (medicos.find(m => m.cpf === cpf)) return res.status(400).json({ error: 'CPF já cadastrado.' });
 
-    const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
-    medicos.push(novoMedico);
-    salvarMedicos(medicos);
+  const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
+  medicos.push(novoMedico);
+  salvarMedicos(medicos);
 
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-    res.json({ success: true, message: 'Cadastro enviado com sucesso! Aguarde aprovação do Admin.' });
-  } catch (err) {
-    console.error("Erro no cadastro:", err);
-    res.status(500).json({ error: 'Erro interno ao realizar cadastro.' });
-  }
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
 });
 
-// Login do Médico
+// Login
 app.post('/api/medico/login', (req, res) => {
   const { cpf, senha } = req.body;
   const medico = medicos.find(m => m.cpf === cpf && m.senha === senha);
-  
   if (!medico) return res.status(401).json({ error: 'CPF ou Senha incorretos.' });
   if (medico.status === 'pendente') return res.status(403).json({ error: 'Cadastro pendente de aprovação.' });
   if (medico.status === 'bloqueado') return res.status(403).json({ error: 'Conta médica bloqueada.' });
@@ -144,7 +122,17 @@ app.post('/api/medico/login', (req, res) => {
   res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
 
-// Admin Endpoints
+// Login Admin Seguro no Backend
+app.post('/api/admin/login', (req, res) => {
+  const { user, pass } = req.body;
+  if (user === 'Admin' && pass === 'Tr0sH!') {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Credenciais inválidas.' });
+  }
+});
+
+// Admin Dados
 app.get('/api/admin/dados', (req, res) => {
   const dh = obterDataHoraBR();
   res.json({
@@ -176,7 +164,7 @@ app.post('/api/admin/medico/excluir', (req, res) => {
   medicos = medicos.filter(m => m.id !== medicoId);
   salvarMedicos(medicos);
   io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  res.json({ success: true, message: 'Médico excluído com sucesso.' });
+  res.json({ success: true });
 });
 
 app.get('/api/admin/download-log/:sessionId', (req, res) => {
@@ -217,15 +205,11 @@ function processarFinalizacaoConsulta(dados) {
         const archive = archiver('zip', { zlib: { level: 9 } });
 
         archive.pipe(output);
-        if (fs.existsSync(pdfPath)) {
-          archive.file(pdfPath, { name: `Anamnese_${paciente?.nome || 'Paciente'}.pdf` });
-        }
+        if (fs.existsSync(pdfPath)) archive.file(pdfPath, { name: `Anamnese_${paciente?.nome || 'Paciente'}.pdf` });
 
         (arquivosTrocados || []).forEach(file => {
           const filePath = path.join(__dirname, 'uploads', file.filename);
-          if (fs.existsSync(filePath)) {
-            archive.file(filePath, { name: `Anexos/${file.originalname}` });
-          }
+          if (fs.existsSync(filePath)) archive.file(filePath, { name: `Anexos/${file.originalname}` });
         });
 
         archive.finalize();
@@ -239,9 +223,6 @@ function processarFinalizacaoConsulta(dados) {
             zipUrl: `/api/admin/download-log/${sessionId}`
           });
 
-          const pGeral = registroPacientesGeral.find(p => p.cpf === paciente?.cpf);
-          if (pGeral) pGeral.status = 'Atendido';
-
           io.emit('atualizar-admin-dashboard', {
             logsConsultas,
             atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
@@ -253,7 +234,7 @@ function processarFinalizacaoConsulta(dados) {
         });
       } catch (e) { console.error('Erro no ZIP:', e); }
     });
-  } catch (err) { console.error('Erro geral ao finalizar consulta:', err); }
+  } catch (err) { console.error('Erro geral ao finalizar:', err); }
 }
 
 // WebSockets
@@ -276,20 +257,11 @@ io.on('connection', (socket) => {
 
   socket.on('entrar-fila', (dados) => {
     const dh = obterDataHoraBR();
-    const paciente = { 
-      id: socket.id, 
-      ...dados, 
-      horaEntrada: dh.hora,
-      status: 'Em Espera'
-    };
+    const paciente = { id: socket.id, ...dados, horaEntrada: dh.hora, status: 'Em Espera' };
     filaPacientes.push(paciente);
     registroPacientesGeral.push(paciente);
     
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-admin-pacientes', {
-      registroPacientesGeral,
-      filaAtualCount: filaPacientes.length
-    });
   });
 
   socket.on('chamar-paciente', (dadosChamada) => {
@@ -314,11 +286,6 @@ io.on('connection', (socket) => {
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-admin-pacientes', {
-      registroPacientesGeral,
-      filaAtualCount: filaPacientes.length
-    });
-    
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
       sender: socket.id,
@@ -357,9 +324,7 @@ io.on('connection', (socket) => {
       processarFinalizacaoConsulta(consulta);
 
       const outroSocketId = socket.id === consulta.medicoSocketId ? consulta.pacienteSocketId : consulta.medicoSocketId;
-      if (outroSocketId) {
-        io.to(outroSocketId).emit('parceiro-desconectou');
-      }
+      if (outroSocketId) io.to(outroSocketId).emit('consulta-encerrada');
 
       consultasAtivas.delete(consulta.medicoSocketId);
       consultasAtivas.delete(consulta.pacienteSocketId);

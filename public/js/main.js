@@ -6,7 +6,6 @@ let currentCall = null;
 let targetSocketId = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
-let arquivosTrocados = [];
 let remoteStream = null;
 
 const rtcConfig = {
@@ -46,8 +45,8 @@ function iniciarPeer() {
   });
 
   peer.on('call', async (call) => {
-    await obterMidiaLocal();
-    call.answer(localStream);
+    const stream = await obterMidiaLocal();
+    call.answer(stream);
     wireCall(call);
   });
 
@@ -63,7 +62,7 @@ function wireCall(call) {
     const remoteVideo = document.getElementById('remote-video');
     if (remoteVideo) {
       remoteVideo.srcObject = stream;
-      remoteVideo.play().catch(e => console.log('Erro play remoto:', e));
+      remoteVideo.play().catch(e => console.warn('Erro play remoto:', e));
     }
   });
 
@@ -78,21 +77,20 @@ async function obterMidiaLocal() {
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    const locVid = document.getElementById('local-video');
+    if (locVid) {
+      locVid.srcObject = localStream;
+      locVid.muted = true;
+      locVid.play().catch(e => console.warn('Erro play local:', e));
+    }
+    return localStream;
   } catch (err) {
-    alert('Permita o acesso à câmera e microfone.');
+    alert('Permita o acesso à câmera e ao microfone para a consulta.');
     return null;
   }
-
-  const locVid = document.getElementById('local-video');
-  if (locVid) {
-    locVid.srcObject = localStream;
-    locVid.muted = true;
-    locVid.play().catch(e => console.log('Erro play local:', e));
-  }
-  return localStream;
 }
 
-// TOGGLE ENTRE LOGIN E CADASTRO DO MÉDICO
+// TOGGLE ENTRE LOGIN E CADASTRO MÉDICO
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 const formLoginMedico = document.getElementById('form-login-medico');
@@ -178,14 +176,14 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   if (containerPaciente) {
     const aprovados = listaMedicos.filter(m => m.statusCadastro === 'aprovado');
     containerPaciente.innerHTML = aprovados.length === 0 
-      ? '<p class="text-xs text-slate-400">Nenhum médico aprovado no momento.</p>'
+      ? '<p class="text-xs text-slate-400">Nenhum médico disponível no momento.</p>'
       : aprovados.map(m => `
         <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
           <div>
             <strong class="text-slate-200">Dr(a). ${m.nome}</strong><br>
             <span class="text-slate-400">CRM: ${m.crm}</span>
           </div>
-          <span class="w-2.5 h-2.5 rounded-full ${m.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span>
+          <span class="w-2.5 h-2.5 rounded-full ${m.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}" title="${m.isOnline ? 'Online' : 'Offline'}"></span>
         </div>
       `).join('');
   }
@@ -193,7 +191,7 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   renderMedicosAdmin(listaMedicos);
 });
 
-// FORMULÁRIO DO PACIENTE E FILA
+// FILA E PACIENTE
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -238,11 +236,13 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
 
-  await obterMidiaLocal();
+  const stream = await obterMidiaLocal();
   iniciarPeer();
 
-  const call = peer.call(pacienteSocketId, localStream);
-  wireCall(call);
+  if (stream) {
+    const call = peer.call(pacienteSocketId, stream);
+    wireCall(call);
+  }
 };
 
 socket.on('chamado-para-consulta', async (dados) => {
@@ -266,10 +266,31 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
+// FINALIZAR CONSULTA SEM LOGOFF AUTOMÁTICO DO MÉDICO
 socket.on('consulta-encerrada', () => {
-  alert('A consulta foi finalizada com sucesso!');
-  location.reload();
+  limparEVoltar();
 });
+
+function limparEVoltar() {
+  if (currentCall) { currentCall.close(); currentCall = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  
+  document.getElementById('remote-video').srcObject = null;
+  document.getElementById('local-video').srcObject = null;
+  document.getElementById('texto-anamnese').value = '';
+  document.getElementById('sala-consulta').classList.add('hidden');
+
+  if (medSessaoAtiva) {
+    // Médico se mantém online e volta para o seu Painel
+    switchTab('medico');
+    document.getElementById('dashboard-medico').classList.remove('hidden');
+  } else {
+    // Paciente volta para a Área do Paciente
+    switchTab('paciente');
+    document.getElementById('lobby-paciente').classList.add('hidden');
+    document.getElementById('form-paciente-box').classList.remove('hidden');
+  }
+}
 
 const btnEncerrar = document.getElementById('btn-encerrar-consulta');
 if (btnEncerrar) {
@@ -280,25 +301,45 @@ if (btnEncerrar) {
   });
 }
 
-// ADMIN DASHBOARD
+// PAINEL DE ADMIN SEGURA VIA BACKEND
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
-  formAdmin.addEventListener('submit', (e) => {
+  formAdmin.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (document.getElementById('adm-user').value === 'Admin' && document.getElementById('adm-pass').value === 'Tr0sH!') {
+    const user = document.getElementById('adm-user').value;
+    const pass = document.getElementById('adm-pass').value;
+
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user, pass })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
       document.getElementById('login-admin-box').classList.add('hidden');
       document.getElementById('dashboard-admin').classList.remove('hidden');
       carregarDadosAdmin();
     } else {
-      alert('Credenciais incorretas!');
+      alert(data.error || 'Credenciais de Administrador inválidas!');
     }
+  });
+}
+
+const btnLogoutAdmin = document.getElementById('btn-logout-admin');
+if (btnLogoutAdmin) {
+  btnLogoutAdmin.addEventListener('click', () => {
+    document.getElementById('dashboard-admin').classList.add('hidden');
+    document.getElementById('login-admin-box').classList.remove('hidden');
   });
 }
 
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
-  const data = await res.json();
-  renderAdminDashboard(data);
+  if (res.ok) {
+    const data = await res.json();
+    renderAdminDashboard(data);
+  }
 }
 
 function renderAdminDashboard(data) {
@@ -400,7 +441,7 @@ if (inputArquivo) {
       const fileData = { filename: data.filename, originalname: data.originalname, path: data.path };
       adicionarArquivoNaLista(fileData);
       socket.emit('novo-arquivo-enviado', { targetId: targetSocketId, file: fileData });
-      alert('Documento enviado ao paciente!');
+      alert('Documento enviado!');
     }
   });
 }

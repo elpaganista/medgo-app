@@ -20,8 +20,7 @@
               dark: '#0b1320',
               panel: '#111c2e',
               card: '#18263e',
-              accent: '#06b6d4',
-              accentHover: '#0891b2'
+              accent: '#06b6d4'
             }
           },
           fontFamily: { sans: ['Inter', 'sans-serif'] }
@@ -32,17 +31,15 @@
 </head>
 <body class="min-h-screen flex flex-col bg-brand-dark text-slate-100 font-sans">
 
-  <!-- Header da Aplicação -->
   <header class="border-b border-slate-800 bg-brand-panel/90 backdrop-blur sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
-        
         <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('paciente')">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
             <i class="fa-solid font-bold text-xl fa-heart-pulse"></i>
           </div>
           <div>
-            <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">Med<span class="text-cyan-400">Go</span></span>
+            <span class="text-xl font-bold tracking-tight text-white">Med<span class="text-cyan-400">Go</span></span>
             <span class="text-xs px-2 py-0.5 ml-2 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/50 font-medium">TELEMEDICINA</span>
           </div>
         </div>
@@ -58,7 +55,6 @@
             <i class="fa-solid fa-user-gear text-amber-400"></i> Administração
           </button>
         </nav>
-
       </div>
     </div>
   </header>
@@ -68,7 +64,6 @@
     <!-- 1. ABA PACIENTE -->
     <section id="tab-paciente" class="tab-content block space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         <div class="bg-brand-panel border border-slate-800 p-6 rounded-2xl">
           <h3 class="text-md font-semibold text-cyan-400 mb-4 flex items-center gap-2">
             <i class="fa-solid fa-stethoscope"></i> Corpo Médico Online
@@ -118,13 +113,11 @@
           <h2 class="text-2xl font-bold text-white">Sala de Espera Virtual</h2>
           <p class="text-sm text-slate-400">Você está na fila de atendimento. Mantenha esta página aberta, o médico chamará a qualquer momento...</p>
         </div>
-
       </div>
     </section>
 
     <!-- 2. ABA MÉDICO -->
     <section id="tab-medico" class="tab-content hidden space-y-6">
-      
       <div id="box-medico-auth" class="max-w-md mx-auto bg-brand-panel border border-slate-800 p-6 rounded-2xl space-y-6">
         <div class="flex border-b border-slate-800 pb-3 gap-4">
           <button type="button" id="btn-med-login-view" class="flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400">Login</button>
@@ -190,12 +183,10 @@
           <ul id="lista-pacientes-fila" class="space-y-3"></ul>
         </div>
       </div>
-
     </section>
 
     <!-- 3. ABA ADMINISTRADOR -->
     <section id="tab-admin" class="tab-content hidden space-y-6">
-      
       <div id="login-admin-box" class="max-w-md mx-auto bg-brand-panel border border-slate-800 p-6 rounded-2xl space-y-4">
         <h2 class="text-lg font-bold text-white">Painel Gestor MedGo</h2>
         <form id="form-login-admin" class="space-y-4">
@@ -242,9 +233,7 @@
 
         <div class="bg-brand-panel p-6 border border-slate-800 rounded-2xl space-y-4">
           <h3 class="text-md font-semibold text-white">Aprovação & Gestão de Médicos</h3>
-          <div id="lista-medicos-admin" class="space-y-3">
-            <p class="text-xs text-slate-400">Carregando médicos...</p>
-          </div>
+          <div id="lista-medicos-admin" class="space-y-3"></div>
         </div>
 
         <div class="bg-brand-panel p-6 border border-slate-800 rounded-2xl space-y-4">
@@ -252,7 +241,6 @@
           <ul id="lista-logs-consultas" class="space-y-3"></ul>
         </div>
       </div>
-
     </section>
 
     <!-- 4. SALA DE CONSULTA EM VÍDEO -->
