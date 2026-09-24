@@ -1,35 +1,20 @@
 const socket = io();
 
 let localStream = null;
-let peer = null;
-let currentCall = null;
+let rtcPeer = null;
 let targetSocketId = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
-let remoteStream = null;
 let currentRoomId = null;
 
-// Configuração STUN e TURN (OpenRelay) para ultrapassar Firewalls e CGNAT
+// Configuração WebRTC nativa usando STUN do Google
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelay',
-      credential: 'openrelay'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelay',
-      credential: 'openrelay'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelay',
-      credential: 'openrelay'
-    }
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
   ]
 };
 
@@ -50,7 +35,6 @@ function switchTab(tabName) {
 
 async function safePlayVideo(videoElement, stream, isMuted = false) {
   if (!videoElement || !stream) return;
-
   videoElement.muted = isMuted;
   videoElement.playsInline = true;
 
@@ -61,9 +45,7 @@ async function safePlayVideo(videoElement, stream, isMuted = false) {
   try {
     await videoElement.play();
   } catch (err) {
-    if (err.name !== 'AbortError') {
-      console.warn('Aviso de autoplay no vídeo:', err);
-    }
+    if (err.name !== 'AbortError') console.warn('Autoplay:', err);
   }
 }
 
@@ -83,80 +65,78 @@ async function obterMidiaLocal() {
   }
 }
 
-// Criar e ligar a instância PeerJS com ID dinâmico para evitar colisão de canal
-function conectarPeerSincronizado(roomId, isDoctor) {
-  if (peer) {
-    try { peer.destroy(); } catch(e) {}
-    peer = null;
+// INICIALIZA A CONEXÃO WEBRTC NATIVA VIA SOCKET.IO
+async function iniciarWebRTCNativo(roomId, isDoctor) {
+  if (rtcPeer) {
+    rtcPeer.close();
+    rtcPeer = null;
   }
 
   currentRoomId = roomId;
   const statusLog = document.getElementById('webrtc-status-log');
+  if (statusLog) statusLog.innerText = "Conectando canal de vídeo...";
 
-  // Peer sem ID fixo (gera hash único nativo na nuvem)
-  peer = new Peer({
-    host: '0.peerjs.com',
-    port: 443,
-    secure: true,
-    config: rtcConfig
-  });
-
-  peer.on('open', async (myPeerId) => {
-    if (statusLog) statusLog.innerText = "Aguardando canal de vídeo...";
-
-    // Registra no socket a entrada na sala e passa o Peer ID dinâmico gerado
-    socket.emit('entrar-sala-consulta', { roomId, peerId: myPeerId, isDoctor });
-  });
-
-  peer.on('call', async (call) => {
-    const stream = await obterMidiaLocal();
-    if (stream) {
-      call.answer(stream);
-      wireCall(call);
-    }
-  });
-
-  peer.on('error', (err) => {
-    console.warn('Aviso PeerJS:', err);
-    if (statusLog) statusLog.innerText = "Erro na reconexão de vídeo.";
-  });
-}
-
-// Disca para o parceiro assim que o socket avisa que o outro Peer ID se conectou
-socket.on('peer-parceiro-conectado', async (data) => {
-  const { peerId } = data;
-  const statusLog = document.getElementById('webrtc-status-log');
-  
-  if (statusLog) statusLog.innerText = "Conectando vídeo com participante...";
+  rtcPeer = new RTCPeerConnection(rtcConfig);
 
   const stream = await obterMidiaLocal();
-  if (peer && stream && peerId) {
-    const call = peer.call(peerId, stream);
-    wireCall(call);
+  if (stream) {
+    stream.getTracks().forEach(track => rtcPeer.addTrack(track, stream));
+  }
+
+  rtcPeer.ontrack = (event) => {
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo && event.streams[0]) {
+      safePlayVideo(remoteVideo, event.streams[0], false);
+      if (statusLog) statusLog.innerText = "🟢 Vídeo e Áudio Conectados";
+    }
+  };
+
+  rtcPeer.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('webrtc-candidate', { candidate: event.candidate, targetId: targetSocketId });
+    }
+  };
+
+  socket.emit('entrar-sala-consulta', { roomId, isDoctor });
+}
+
+// SINALIZAÇÃO WEBRTC VIA SOCKET.IO
+socket.on('usuario-entrou-na-sala', async (data) => {
+  targetSocketId = data.socketId;
+
+  // O Médico cria a proposta (Offer)
+  if (data.isDoctor) {
+    const offer = await rtcPeer.createOffer();
+    await rtcPeer.setLocalDescription(offer);
+    socket.emit('webrtc-offer', { offer, targetId: targetSocketId });
   }
 });
 
-function wireCall(call) {
-  if (!call) return;
-  currentCall = call;
+socket.on('webrtc-offer', async (data) => {
+  targetSocketId = data.senderId;
+  await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.offer));
+  
+  const answer = await rtcPeer.createAnswer();
+  await rtcPeer.setLocalDescription(answer);
+  
+  socket.emit('webrtc-answer', { answer, targetId: targetSocketId });
+});
 
-  call.on('stream', (stream) => {
-    remoteStream = stream;
-    const remoteVideo = document.getElementById('remote-video');
-    const statusLog = document.getElementById('webrtc-status-log');
+socket.on('webrtc-answer', async (data) => {
+  await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.answer));
+});
 
-    if (remoteVideo) {
-      safePlayVideo(remoteVideo, stream, false);
+socket.on('webrtc-candidate', async (data) => {
+  try {
+    if (data.candidate) {
+      await rtcPeer.addIceCandidate(new RTCIceCandidate(data.candidate));
     }
+  } catch (e) {
+    console.warn('Erro candidate:', e);
+  }
+});
 
-    if (statusLog) statusLog.innerText = "🟢 Vídeo e Áudio Conectados";
-  });
-
-  call.on('close', () => { currentCall = null; });
-  call.on('error', (e) => console.warn('Erro na chamada:', e));
-}
-
-// Alternar visão Login / Cadastro Médico
+// ALTERNAR MÉDICO LOGIN / CADASTRO
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 const formLoginMedico = document.getElementById('form-login-medico');
@@ -255,7 +235,7 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   renderMedicosAdmin(listaMedicos);
 });
 
-// Fila de Espera Paciente
+// FILA PACIENTE
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -302,7 +282,7 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   configurarInterfaceConsulta(true);
 
   await obterMidiaLocal();
-  conectarPeerSincronizado(roomId, true);
+  iniciarWebRTCNativo(roomId, true);
 };
 
 socket.on('chamado-para-consulta', async (dados) => {
@@ -313,7 +293,7 @@ socket.on('chamado-para-consulta', async (dados) => {
   configurarInterfaceConsulta(false);
 
   await obterMidiaLocal();
-  conectarPeerSincronizado(roomId, false);
+  iniciarWebRTCNativo(roomId, false);
 });
 
 function configurarInterfaceConsulta(isDoctor) {
@@ -334,8 +314,7 @@ socket.on('consulta-encerrada', () => {
 });
 
 function limparEVoltar() {
-  if (currentCall) { currentCall.close(); currentCall = null; }
-  if (peer) { peer.destroy(); peer = null; }
+  if (rtcPeer) { rtcPeer.close(); rtcPeer = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   
   document.getElementById('remote-video').srcObject = null;

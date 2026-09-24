@@ -87,13 +87,12 @@ function obterMedicosComStatus() {
   }));
 }
 
-// Upload
+// API Endpoints
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
   res.json({ filename: req.file.filename, originalname: req.file.originalname, path: `/uploads/${req.file.filename}` });
 });
 
-// Cadastro
 app.post('/api/medico/cadastro', (req, res) => {
   const { nome, cpf, email, crm, senha } = req.body;
   if (!nome || !cpf || !crm || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
@@ -107,7 +106,6 @@ app.post('/api/medico/cadastro', (req, res) => {
   res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
 });
 
-// Login
 app.post('/api/medico/login', (req, res) => {
   const { cpf, senha } = req.body;
   const medico = medicos.find(m => m.cpf === cpf && m.senha === senha);
@@ -118,7 +116,6 @@ app.post('/api/medico/login', (req, res) => {
   res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
 
-// Admin Login
 app.post('/api/admin/login', (req, res) => {
   const { user, pass } = req.body;
   if (user === 'Admin' && pass === 'Tr0sH!') {
@@ -128,7 +125,6 @@ app.post('/api/admin/login', (req, res) => {
   }
 });
 
-// Admin Dados
 app.get('/api/admin/dados', (req, res) => {
   const dh = obterDataHoraBR();
   res.json({
@@ -282,9 +278,6 @@ io.on('connection', (socket) => {
     consultasAtivas.set(socket.id, dadosConsulta);
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
-    // Adiciona ambos os sockets na sala única para troca de sinalização
-    socket.join(roomId);
-
     io.emit('atualizar-fila', filaPacientes);
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
@@ -295,12 +288,23 @@ io.on('connection', (socket) => {
     });
   });
 
+  // SINALIZAÇÃO WEBRTC DIRETA
   socket.on('entrar-sala-consulta', (data) => {
-    const { roomId, peerId } = data;
+    const { roomId, isDoctor } = data;
     socket.join(roomId);
+    socket.to(roomId).emit('usuario-entrou-na-sala', { socketId: socket.id, isDoctor });
+  });
 
-    // Transmite para os outros membros da sala o Peer ID dinâmico recém-gerado
-    socket.to(roomId).emit('peer-parceiro-conectado', { peerId });
+  socket.on('webrtc-offer', (data) => {
+    io.to(data.targetId).emit('webrtc-offer', { offer: data.offer, senderId: socket.id });
+  });
+
+  socket.on('webrtc-answer', (data) => {
+    io.to(data.targetId).emit('webrtc-answer', { answer: data.answer, senderId: socket.id });
+  });
+
+  socket.on('webrtc-candidate', (data) => {
+    io.to(data.targetId).emit('webrtc-candidate', { candidate: data.candidate, senderId: socket.id });
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
