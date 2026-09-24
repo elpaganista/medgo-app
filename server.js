@@ -64,6 +64,7 @@ let statsGeral = carregarStats();
 let filaPacientes = [];
 let registroPacientesGeral = [];
 let consultasAtivas = new Map();
+let medicosOnline = new Map(); // socket.id -> medico
 let logsConsultas = [];
 
 function obterDataHoraBR() {
@@ -104,7 +105,7 @@ app.post('/api/medico/cadastro', (req, res) => {
   medicos.push(novoMedico);
   salvarMedicos(medicos);
 
-  io.emit('atualizar-admin-medicos', medicos);
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
   res.json({ success: true, message: 'Cadastro enviado para aprovação do Administrador.' });
 });
 
@@ -117,14 +118,26 @@ app.post('/api/medico/login', (req, res) => {
   if (medico.status === 'pendente') return res.status(403).json({ error: 'Cadastro pendente de aprovação.' });
   if (medico.status === 'bloqueado') return res.status(403).json({ error: 'Conta médica bloqueada.' });
 
-  res.json({ success: true, medico: { nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
+  res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
+
+function obterMedicosComStatus() {
+  const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
+  return medicos.map(m => ({
+    id: m.id,
+    nome: m.nome,
+    crm: m.crm,
+    cpf: m.cpf,
+    statusCadastro: m.status,
+    isOnline: cpfsOnline.has(m.cpf)
+  }));
+}
 
 // Admin Endpoints
 app.get('/api/admin/dados', (req, res) => {
   const dh = obterDataHoraBR();
   res.json({
-    medicos,
+    medicos: obterMedicosComStatus(),
     logsConsultas,
     registroPacientesGeral,
     atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
@@ -140,7 +153,7 @@ app.post('/api/admin/medico/status', (req, res) => {
   if (medico) {
     medico.status = novoStatus;
     salvarMedicos(medicos);
-    io.emit('atualizar-admin-medicos', medicos);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
     res.json({ success: true });
   } else {
     res.status(404).json({ error: 'Médico não encontrado.' });
@@ -217,17 +230,28 @@ function processarFinalizacaoConsulta(dados) {
           });
         });
       } catch (e) {
-        console.error("Erro ao gerar ZIP:", e);
+        console.error("Erro ZIP:", e);
       }
     });
   } catch (err) {
-    console.error("Erro no processamento da consulta:", err);
+    console.error("Erro finalização:", err);
   }
 }
 
-// WebSockets & Sinalização WebRTC Nativa (Sem PeerJS Externa)
+// WebSockets & Sinalização
 io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
+  socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+
+  socket.on('medico-online', (medico) => {
+    medicosOnline.set(socket.id, medico);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  });
+
+  socket.on('medico-offline', () => {
+    medicosOnline.delete(socket.id);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  });
 
   socket.on('entrar-fila', (dados) => {
     const dh = obterDataHoraBR();
@@ -281,7 +305,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Troca de Sinais WebRTC (Offer, Answer, ICE Candidate)
+  // Sinalização WebRTC Direta
   socket.on('webrtc-offer', (data) => {
     io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
   });
@@ -321,6 +345,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     filaPacientes = filaPacientes.filter(p => p.id !== socket.id);
+    medicosOnline.delete(socket.id);
 
     if (consultasAtivas.has(socket.id)) {
       const consulta = consultasAtivas.get(socket.id);
@@ -334,6 +359,7 @@ io.on('connection', (socket) => {
     }
 
     io.emit('atualizar-fila', filaPacientes);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
     io.emit('atualizar-admin-pacientes', {
       registroPacientesGeral,
       filaAtualCount: filaPacientes.length

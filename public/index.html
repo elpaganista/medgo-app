@@ -20,7 +20,7 @@
     </div>
   </header>
 
-  <!-- Navegação por Abas Principais (Sempre visível para alternar) -->
+  <!-- Navegação por Abas Principais -->
   <nav class="tabs-nav" id="main-nav-tabs">
     <button class="tab-btn active" data-tab="paciente" id="nav-btn-paciente">Área do Paciente</button>
     <button class="tab-btn" data-tab="medico" id="nav-btn-medico">Área Médica</button>
@@ -36,6 +36,15 @@
           <h2>Atendimento MedGo</h2>
           <p>Preencha seus dados para entrar na fila de consulta</p>
         </div>
+        
+        <!-- Lista de Médicos Cadastrados e Status Online -->
+        <div style="margin: 1rem 0; padding: 12px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border);">
+          <h4 style="font-size:0.9rem; color:var(--text-muted); margin-bottom:8px;">Médicos na Plataforma:</h4>
+          <div id="lista-medicos-status-paciente" style="font-size:0.85rem;">
+            <p style="color:var(--text-muted);">Carregando lista de médicos...</p>
+          </div>
+        </div>
+
         <form id="form-paciente">
           <div class="input-group">
             <label for="pac-nome">Nome Completo</label>
@@ -65,7 +74,7 @@
         <div class="lobby-content">
           <h2>Sala de Espera Virtual</h2>
           <p>Você está na fila de atendimento. Mantenha esta tela aberta. O médico iniciará sua chamada em breve...</p>
-          <div class="status-badge" style="margin-top:15px; padding:10px; background:var(--primary); color:white; border-radius:8px; text-align:center;">Aguardando médico...</div>
+          <div style="margin-top:15px; padding:12px; background:var(--primary); color:white; border-radius:8px; text-align:center; font-weight:600;">Aguardando médico...</div>
         </div>
       </div>
     </section>
@@ -213,13 +222,13 @@
       <div class="grid-consulta">
         
         <div class="video-container">
-          <!-- Vídeo Remoto (A pessoa com quem você fala) -->
+          <!-- Vídeo Remoto -->
           <div class="video-box main-video">
             <span class="badge" id="label-remote-video">Vídeo Remoto</span>
             <video id="remote-video" autoplay playsinline webkit-playsinline></video>
           </div>
 
-          <!-- Vídeo Local (Você) -->
+          <!-- Vídeo Local -->
           <div class="video-box sub-video">
             <span class="badge" id="label-local-video">Seu Vídeo</span>
             <video id="local-video" autoplay muted playsinline webkit-playsinline></video>

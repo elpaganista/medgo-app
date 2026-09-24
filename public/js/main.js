@@ -9,7 +9,7 @@ let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
 
-// Servidores STUN/TURN Públicos e de Alta Conectividade
+// Servidores STUN/TURN de Conectividade Global
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -20,7 +20,7 @@ const rtcConfig = {
   ]
 };
 
-// MÁSCARAS
+// MÁSCARAS DE ENTRADA
 function aplicarMascaraCPF(e) {
   let v = e.target.value.replace(/\D/g, '');
   if (v.length > 11) v = v.substring(0, 11);
@@ -63,7 +63,7 @@ if (btnTema) {
   });
 }
 
-// Controle de Navegação das 3 Abas Principais (Lógica sem Ocultar Botões)
+// Controle de Navegação por Abas
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -78,16 +78,20 @@ tabButtons.forEach(btn => {
   });
 });
 
-// Captura de Câmera/Microfone
+function ocultarAbasNavegacao() {
+  document.getElementById('main-nav-tabs').classList.add('hidden');
+}
+
+function exibirAbasNavegacao() {
+  document.getElementById('main-nav-tabs').classList.remove('hidden');
+}
+
+// Captura de Mídia
 async function obterMidiaLocal() {
   if (localStream) return localStream;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        facingMode: "user"
-      },
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
       audio: true
     });
     const locVid = document.getElementById('local-video');
@@ -98,24 +102,22 @@ async function obterMidiaLocal() {
     }
     return localStream;
   } catch (err) {
-    alert('Permita o acesso à Câmera e Microfone para realizar a consulta de vídeo.');
+    alert('Permita o acesso à Câmera e ao Microfone no seu navegador.');
     console.error('Erro de mídia:', err);
     return null;
   }
 }
 
-// Criar Conexão WebRTC Nativa
+// Conexão WebRTC
 function criarPeerConnection(outroSocketId) {
   peerConnection = new RTCPeerConnection(rtcConfig);
 
-  // Adicionar faixas locais (áudio/vídeo)
   if (localStream) {
     localStream.getTracks().forEach(track => {
       peerConnection.addTrack(track, localStream);
     });
   }
 
-  // Receber stream remota
   peerConnection.ontrack = (event) => {
     const remoteVideo = document.getElementById('remote-video');
     if (remoteVideo && event.streams[0]) {
@@ -124,7 +126,6 @@ function criarPeerConnection(outroSocketId) {
     }
   };
 
-  // Enviar candidatos ICE
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
       socket.emit('webrtc-ice-candidate', { target: outroSocketId, candidate: event.candidate });
@@ -132,7 +133,6 @@ function criarPeerConnection(outroSocketId) {
   };
 }
 
-// Sinalização WebRTC via Socket.io
 socket.on('webrtc-offer', async (data) => {
   targetSocketId = data.sender;
   await obterMidiaLocal();
@@ -156,7 +156,7 @@ socket.on('webrtc-ice-candidate', async (data) => {
     try {
       await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
     } catch (e) {
-      console.error('Erro ao adicionar Candidate:', e);
+      console.error('Erro Candidate:', e);
     }
   }
 });
@@ -187,7 +187,25 @@ if (btnToggleCam) {
   });
 }
 
-// Formulários Área Médica
+// Lista de Médicos com Bolinha Verde
+socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
+  const containerPaciente = document.getElementById('lista-medicos-status-paciente');
+  if (containerPaciente) {
+    const aprovados = listaMedicos.filter(m => m.statusCadastro === 'aprovado');
+    if (aprovados.length === 0) {
+      containerPaciente.innerHTML = '<p style="color:var(--text-muted);">Nenhum médico cadastrado no momento.</p>';
+    } else {
+      containerPaciente.innerHTML = aprovados.map(m => `
+        <div style="margin-bottom:4px; display:flex; align-items:center;">
+          <span class="status-indicator ${m.isOnline ? 'online' : 'offline'}"></span>
+          <strong>Dr(a). ${m.nome}</strong> (CRM: ${m.crm}) - <em style="margin-left:4px;">${m.isOnline ? 'Online' : 'Offline'}</em>
+        </div>
+      `).join('');
+    }
+  }
+});
+
+// Login e Sessão Médica
 const formLoginMedico = document.getElementById('form-login-medico');
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
 const btnMedLoginView = document.getElementById('btn-med-login-view');
@@ -209,28 +227,6 @@ if (btnMedLoginView && btnMedCadView) {
   });
 }
 
-if (formCadastroMedico) {
-  formCadastroMedico.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const dados = {
-      nome: document.getElementById('med-cad-nome').value,
-      cpf: document.getElementById('med-cad-cpf').value,
-      email: document.getElementById('med-cad-email').value,
-      crm: document.getElementById('med-cad-crm').value,
-      senha: document.getElementById('med-cad-senha').value,
-    };
-
-    const res = await fetch('/api/medico/cadastro', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dados)
-    });
-    const data = await res.json();
-    alert(data.message || data.error);
-    if (res.ok) formCadastroMedico.reset();
-  });
-}
-
 if (formLoginMedico) {
   formLoginMedico.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -247,6 +243,7 @@ if (formLoginMedico) {
     if (res.ok) {
       medSessaoAtiva = data.medico;
       salvarMedicoLocal(medSessaoAtiva);
+      socket.emit('medico-online', medSessaoAtiva);
       ativarPainelMedico(medSessaoAtiva);
     } else {
       alert(data.error);
@@ -260,11 +257,13 @@ function ativarPainelMedico(medico) {
   
   document.getElementById('box-medico-auth').classList.add('hidden');
   document.getElementById('dashboard-medico').classList.remove('hidden');
+  ocultarAbasNavegacao();
 }
 
 const medicoSalvo = obterMedicoSalvoLocal();
 if (medicoSalvo) {
   medSessaoAtiva = medicoSalvo;
+  socket.emit('medico-online', medicoSalvo);
   ativarPainelMedico(medicoSalvo);
 }
 
@@ -272,14 +271,42 @@ if (medicoSalvo) {
 const btnLogoutMed = document.getElementById('btn-logout-medico');
 if (btnLogoutMed) {
   btnLogoutMed.addEventListener('click', () => {
+    socket.emit('medico-offline');
     medSessaoAtiva = null;
     salvarMedicoLocal(null);
     document.getElementById('dashboard-medico').classList.add('hidden');
     document.getElementById('box-medico-auth').classList.remove('hidden');
+    exibirAbasNavegacao();
   });
 }
 
-// Paciente Fila
+// Login Admin RESTAURADO
+const formAdmin = document.getElementById('form-login-admin');
+if (formAdmin) {
+  formAdmin.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const user = document.getElementById('adm-user').value;
+    const pass = document.getElementById('adm-pass').value;
+
+    if (user === 'Admin' && pass === 'Tr0sH!') {
+      document.getElementById('login-admin-box').classList.add('hidden');
+      document.getElementById('dashboard-admin').classList.remove('hidden');
+      carregarDadosAdmin();
+    } else {
+      alert('Usuário ou senha do Administrador incorretos!');
+    }
+  });
+}
+
+const btnLogoutAdmin = document.getElementById('btn-logout-admin');
+if (btnLogoutAdmin) {
+  btnLogoutAdmin.addEventListener('click', () => {
+    document.getElementById('dashboard-admin').classList.add('hidden');
+    document.getElementById('login-admin-box').classList.remove('hidden');
+  });
+}
+
+// Fila de Pacientes
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -295,6 +322,7 @@ if (formPac) {
     socket.emit('entrar-fila', dados);
     document.getElementById('form-paciente-box').classList.add('hidden');
     document.getElementById('lobby-paciente').classList.remove('hidden');
+    ocultarAbasNavegacao();
   });
 }
 
@@ -346,7 +374,8 @@ socket.on('chamado-para-consulta', (dados) => {
 
 function configurarInterfaceConsulta(isDoctor) {
   document.getElementById('sala-consulta').classList.remove('hidden');
-  
+  ocultarAbasNavegacao();
+
   if (isDoctor) {
     document.getElementById('anamnese-box').classList.remove('hidden');
     document.getElementById('area-upload-medico').classList.remove('hidden');
@@ -360,7 +389,7 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Desconexão e Finalização
+// Finalização de Consulta
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou.');
   limparEVoltarLobby();
@@ -397,6 +426,7 @@ function limparEVoltarLobby() {
     document.getElementById('tab-paciente').classList.remove('hidden');
     document.getElementById('lobby-paciente').classList.add('hidden');
     document.getElementById('form-paciente-box').classList.remove('hidden');
+    exibirAbasNavegacao();
   }
 }
 
@@ -407,4 +437,18 @@ if (btnEncerrar) {
     const anamnese = txt ? txt.value : '';
     socket.emit('finalizar-consulta', { anamnese });
   });
+}
+
+// Painel Admin
+async function carregarDadosAdmin() {
+  const res = await fetch('/api/admin/dados');
+  const data = await res.json();
+  renderAdminDashboard(data);
+}
+
+function renderAdminDashboard(data) {
+  document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje || 0;
+  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
+  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
+  document.getElementById('count-admin-fila').innerText = data.filaAtualCount || 0;
 }
