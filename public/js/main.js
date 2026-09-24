@@ -6,15 +6,23 @@ let targetSocketId = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
 let currentRoomId = null;
+let pendingCandidates = [];
 
-// Configuração WebRTC nativa usando STUN do Google
+// Configuração WebRTC: STUN do Google + TURN público (openrelay) para
+// atravessar CGNAT/NAT simétrico quando STUN sozinho não é suficiente.
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ]
 };
 
@@ -65,12 +73,25 @@ async function obterMidiaLocal() {
   }
 }
 
+async function aplicarCandidatosPendentes() {
+  if (!rtcPeer || !rtcPeer.remoteDescription) return;
+  while (pendingCandidates.length > 0) {
+    const candidate = pendingCandidates.shift();
+    try {
+      await rtcPeer.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+      console.warn('Erro ao aplicar ICE candidate pendente:', e);
+    }
+  }
+}
+
 // INICIALIZA A CONEXÃO WEBRTC NATIVA VIA SOCKET.IO
 async function iniciarWebRTCNativo(roomId, isDoctor) {
   if (rtcPeer) {
     try { rtcPeer.close(); } catch(e){}
     rtcPeer = null;
   }
+  pendingCandidates = [];
 
   currentRoomId = roomId;
   const statusLog = document.getElementById('webrtc-status-log');
@@ -97,14 +118,18 @@ async function iniciarWebRTCNativo(roomId, isDoctor) {
     }
   };
 
-  // Entra na sala no servidor
-  socket.emit('entrar-sala-consulta', { roomId, isDoctor });
+  rtcPeer.oniceconnectionstatechange = () => {
+    if (!rtcPeer) return;
+    console.log('ICE state:', rtcPeer.iceConnectionState);
+    if (statusLog && (rtcPeer.iceConnectionState === 'failed' || rtcPeer.iceConnectionState === 'disconnected')) {
+      statusLog.innerText = "⚠️ Falha na conexão de rede (tentando TURN/STUN)...";
+    }
+  };
 
-  // Se for o paciente, notifica que já está pronto para receber a Oferta de vídeo
-  if (!isDoctor) {
-    setTimeout(() => {
-      socket.emit('paciente-pronto-para-oferta', { roomId });
-    }, 500);
+  // Se for o paciente, avisa DIRETAMENTE o médico (pelo socket id, sem
+  // depender de sala/timing) que já está pronto para receber a Oferta.
+  if (!isDoctor && targetSocketId) {
+    socket.emit('paciente-pronto-para-oferta', { targetId: targetSocketId });
   }
 }
 
@@ -126,6 +151,8 @@ socket.on('webrtc-offer', async (data) => {
   if (!rtcPeer) return;
 
   await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.offer));
+  await aplicarCandidatosPendentes();
+
   const answer = await rtcPeer.createAnswer();
   await rtcPeer.setLocalDescription(answer);
   
@@ -135,13 +162,17 @@ socket.on('webrtc-offer', async (data) => {
 socket.on('webrtc-answer', async (data) => {
   if (rtcPeer && rtcPeer.signalingState !== 'closed') {
     await rtcPeer.setRemoteDescription(new RTCSessionDescription(data.answer));
+    await aplicarCandidatosPendentes();
   }
 });
 
 socket.on('webrtc-candidate', async (data) => {
+  if (!data.candidate) return;
   try {
-    if (rtcPeer && data.candidate && rtcPeer.remoteDescription) {
+    if (rtcPeer && rtcPeer.remoteDescription) {
       await rtcPeer.addIceCandidate(new RTCIceCandidate(data.candidate));
+    } else {
+      pendingCandidates.push(data.candidate);
     }
   } catch (e) {
     console.warn('Erro candidate:', e);
@@ -328,7 +359,10 @@ socket.on('consulta-encerrada', () => {
 function limparEVoltar() {
   if (rtcPeer) { rtcPeer.close(); rtcPeer = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-  
+  pendingCandidates = [];
+  targetSocketId = null;
+  currentRoomId = null;
+
   document.getElementById('remote-video').srcObject = null;
   document.getElementById('local-video').srcObject = null;
   document.getElementById('texto-anamnese').value = '';

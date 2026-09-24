@@ -288,16 +288,12 @@ io.on('connection', (socket) => {
     });
   });
 
-  // SINALIZAÇÃO WEBRTC DIRETA RESILIENTE
-  socket.on('entrar-sala-consulta', (data) => {
-    const { roomId } = data;
-    socket.join(roomId);
-  });
-
+  // SINALIZAÇÃO WEBRTC — sempre ponto-a-ponto via socket id (sem salas/timing)
   socket.on('paciente-pronto-para-oferta', (data) => {
-    const { roomId } = data;
-    // Avisa o médico na sala que o paciente está pronto para a Oferta
-    socket.to(roomId).emit('iniciar-criacao-oferta', { pacienteSocketId: socket.id });
+    const { targetId } = data;
+    if (targetId) {
+      io.to(targetId).emit('iniciar-criacao-oferta', { pacienteSocketId: socket.id });
+    }
   });
 
   socket.on('webrtc-offer', (data) => {
