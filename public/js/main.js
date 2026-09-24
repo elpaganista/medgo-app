@@ -9,18 +9,35 @@ let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
 
-// [CORREÇÃO] Candidatos ICE que chegam antes da conexão estar pronta ficam aqui (antes eram descartados)
+// Candidatos ICE que chegam antes da conexão estar pronta
 let candidatosPendentes = [];
-// [CORREÇÃO] Stream de reserva caso o navegador não entregue event.streams[0]
+// Stream de reserva caso o navegador não entregue event.streams[0]
 let remoteStream = null;
 
-// Servidores TURN/STUN Profissionais e Abertos para Romper Firewalls Globais
+// Servidores TURN/STUN Profissionais e Abertos para Romper Firewalls Globais e Conexões Internacionais
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    // OpenRelay TURN (Sem limite regional)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelay',
+      credential: 'openrelay'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelay',
+      credential: 'openrelay'
+    },
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelay',
+      credential: 'openrelay'
+    },
+    // Metered TURN (Fallback TCP/UDP)
     {
       urls: 'turn:global.relay.metered.ca:80',
       username: 'e823f6eb7e39ef695420e181',
@@ -28,18 +45,6 @@ const rtcConfig = {
     },
     {
       urls: 'turn:global.relay.metered.ca:443',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
-    },
-    {
-      urls: 'turn:global.relay.metered.ca:443?transport=tcp',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
-    },
-    // [CORREÇÃO] Entradas padrão da Metered que faltavam (TCP 80 e TURN sobre TLS 443),
-    // necessárias para redes corporativas/4G/Safari que bloqueiam UDP.
-    {
-      urls: 'turn:global.relay.metered.ca:80?transport=tcp',
       username: 'e823f6eb7e39ef695420e181',
       credential: 'K8a2x8C83/aJ9fGL'
     },
@@ -113,14 +118,11 @@ tabButtons.forEach(btn => {
 async function obterMidiaLocal() {
   if (localStream) return localStream;
 
-  // [CORREÇÃO] Navegadores sem suporte / página fora de HTTPS não têm navigator.mediaDevices
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     alert('Este navegador não permite acessar câmera e microfone. Abra o site por HTTPS (ou localhost) em um navegador atualizado.');
     return null;
   }
 
-  // [CORREÇÃO] 1ª tentativa = configuração original; 2ª = simples (alguns Safari/Firefox/câmeras
-  // rejeitam "min" com OverconstrainedError)
   const tentativas = [
     {
       video: {
@@ -140,7 +142,7 @@ async function obterMidiaLocal() {
       break;
     } catch (err) {
       ultimoErro = err;
-      if (err && err.name === 'NotAllowedError') break; // permissão negada: não adianta insistir
+      if (err && err.name === 'NotAllowedError') break;
     }
   }
 
@@ -154,14 +156,15 @@ async function obterMidiaLocal() {
   if (locVid) {
     locVid.srcObject = localStream;
     locVid.muted = true;
+    locVid.playsInline = true;
     locVid.play().catch(e => console.log('Erro play local:', e));
   }
   return localStream;
 }
 
-// [CORREÇÃO] Tocar o vídeo remoto; se o navegador bloquear autoplay com áudio (Safari/iOS),
-// mostra um botão para o usuário tocar uma vez.
+// Tocar o vídeo remoto (Tratamento de Autoplay Safari/iOS)
 function tocarVideoRemoto(video) {
+  video.playsInline = true;
   const p = video.play();
   if (p && p.catch) {
     p.catch(err => {
@@ -186,7 +189,7 @@ function mostrarBotaoAtivarMidia(video) {
   box.appendChild(btn);
 }
 
-// [CORREÇÃO] Aplica os candidatos ICE guardados assim que a descrição remota existe
+// Aplica candidatos ICE guardados após setRemoteDescription
 async function aplicarCandidatosPendentes() {
   if (!peerConnection || !peerConnection.remoteDescription) return;
   const lista = candidatosPendentes;
@@ -212,7 +215,6 @@ function criarPeerConnection(outroSocketId) {
     const remoteVideo = document.getElementById('remote-video');
     if (!remoteVideo) return;
 
-    // [CORREÇÃO] Se o navegador não entregar o stream, monta um com a track recebida
     let stream = event.streams && event.streams[0];
     if (!stream) {
       if (!remoteStream) remoteStream = new MediaStream();
@@ -224,7 +226,6 @@ function criarPeerConnection(outroSocketId) {
     tocarVideoRemoto(remoteVideo);
   };
 
-  // [CORREÇÃO] Log de diagnóstico (F12 → Console)
   peerConnection.oniceconnectionstatechange = () => {
     console.log('ICE state:', peerConnection && peerConnection.iceConnectionState);
   };
@@ -239,15 +240,13 @@ function criarPeerConnection(outroSocketId) {
 socket.on('webrtc-offer', async (data) => {
   targetSocketId = data.sender;
 
-  // [CORREÇÃO] Limpa restos de chamada anterior ANTES de qualquer await,
-  // para não apagar os candidatos ICE que chegarem enquanto a câmera é liberada.
   if (peerConnection) { peerConnection.close(); peerConnection = null; }
   candidatosPendentes = [];
 
   await obterMidiaLocal();
   criarPeerConnection(targetSocketId);
   await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-  await aplicarCandidatosPendentes(); // [CORREÇÃO] aplica os candidatos que chegaram cedo demais
+  await aplicarCandidatosPendentes();
   
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
@@ -258,14 +257,12 @@ socket.on('webrtc-offer', async (data) => {
 socket.on('webrtc-answer', async (data) => {
   if (peerConnection) {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    await aplicarCandidatosPendentes(); // [CORREÇÃO]
+    await aplicarCandidatosPendentes();
   }
 });
 
 socket.on('webrtc-ice-candidate', async (data) => {
   if (!data.candidate) return;
-  // [CORREÇÃO] Antes: se a conexão ainda não existia ou não tinha descrição remota,
-  // o candidato era descartado em silêncio. Agora fica na fila até poder ser aplicado.
   if (peerConnection && peerConnection.remoteDescription) {
     try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn('Erro ao adicionar ICE:', e); }
   } else {
@@ -294,7 +291,7 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   }
 });
 
-// Atualização Completa do Admin em Tempo Real
+// Atualização do Admin
 socket.on('atualizar-admin-dashboard', (data) => {
   renderAdminDashboard(data);
 });
@@ -455,7 +452,7 @@ socket.on('atualizar-fila', (fila) => {
 
 window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   targetSocketId = pacienteSocketId;
-  candidatosPendentes = []; // [CORREÇÃO] começa a chamada sem sobras da anterior
+  candidatosPendentes = [];
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
   socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
@@ -463,14 +460,15 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   await obterMidiaLocal();
   criarPeerConnection(targetSocketId);
   
-  // [CORREÇÃO] Garante que a offer peça áudio/vídeo do paciente mesmo se a câmera local falhar
   const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
   await peerConnection.setLocalDescription(offer);
   
   socket.emit('webrtc-offer', { target: targetSocketId, sdp: offer });
 };
 
+// Captura e atribuição obrigatória do Socket ID do médico no lado do Paciente
 socket.on('chamado-para-consulta', (dados) => {
+  targetSocketId = dados.medicoSocketId || dados.sender;
   alert('O médico chamou para a consulta!');
   document.getElementById('tab-paciente').classList.add('hidden');
   
@@ -498,7 +496,7 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Finalização
+// Finalização da Consulta
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou.');
   limparEVoltarLobby();
@@ -514,13 +512,14 @@ function limparEVoltarLobby() {
     peerConnection.close();
     peerConnection = null;
   }
-  // [CORREÇÃO] Limpa vídeo remoto, botão de ativação e fila de candidatos da chamada encerrada
   candidatosPendentes = [];
   remoteStream = null;
+  
   const remotoVid = document.getElementById('remote-video');
   if (remotoVid) remotoVid.srcObject = null;
   const btnAtivar = document.getElementById('btn-ativar-midia');
   if (btnAtivar) btnAtivar.remove();
+  
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
@@ -529,7 +528,9 @@ function limparEVoltarLobby() {
   const txtAnamnese = document.getElementById('texto-anamnese');
   if (txtAnamnese) txtAnamnese.value = '';
   
-  document.getElementById('lista-arquivos').innerHTML = '<p class="empty-files">Nenhum documento anexado ainda.</p>';
+  const listaArq = document.getElementById('lista-arquivos');
+  if (listaArq) listaArq.innerHTML = '<p class="empty-files">Nenhum documento anexado ainda.</p>';
+  
   document.getElementById('info-medico-paciente-banner').classList.add('hidden');
   arquivosTrocados = [];
   currentConsultation = null;
@@ -654,8 +655,12 @@ window.excluirMedicoAdmin = async (medicoId) => {
     body: JSON.stringify({ medicoId })
   });
 };
-// Listener para Upload e Envio de Documentos pelo Médico
-const inputArquivo = document.getElementById('input-arquivo');
+
+// ==========================================
+// UPLOAD E RECEBIMENTO DE DOCUMENTOS (SISTEMA UNIFICADO)
+// ==========================================
+
+const inputArquivo = document.getElementById('input-arquivo') || document.getElementById('input-arquivo-medico');
 if (inputArquivo) {
   inputArquivo.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -665,7 +670,6 @@ if (inputArquivo) {
     formData.append('arquivo', file);
 
     try {
-      // 1. Faz o upload físico para a pasta /uploads do servidor
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData
@@ -680,16 +684,16 @@ if (inputArquivo) {
           path: data.path
         };
 
-        // 2. Registra na lista local
+        arquivosTrocados.push(fileData);
         adicionarArquivoNaLista(fileData);
 
-        // 3. Notifica o paciente em tempo real via Socket.IO
         socket.emit('novo-arquivo-enviado', {
           targetId: targetSocketId,
           file: fileData
         });
 
-        alert('Documento enviado ao paciente com sucesso!');
+        inputArquivo.value = '';
+        alert('Documento enviado com sucesso!');
       } else {
         alert(data.error || 'Erro ao enviar arquivo.');
       }
@@ -700,13 +704,13 @@ if (inputArquivo) {
   });
 }
 
-// Escuta o recebimento de arquivos do médico no lado do paciente
+// Escuta a chegada de ficheiros vindos do outro participante
 socket.on('receber-arquivo-medico', (fileData) => {
+  arquivosTrocados.push(fileData);
   adicionarArquivoNaLista(fileData);
   alert(`Você recebeu um novo documento: ${fileData.originalname}`);
 });
 
-// Função para renderizar o link de download na tela do chat
 function adicionarArquivoNaLista(file) {
   const container = document.getElementById('lista-arquivos');
   if (!container) return;
@@ -716,10 +720,10 @@ function adicionarArquivoNaLista(file) {
 
   const div = document.createElement('div');
   div.className = 'item-row';
-  div.style.cssText = 'margin-bottom:8px; padding:8px; background:var(--bg-color); border-radius:6px;';
+  div.style.cssText = 'margin-bottom:8px; padding:8px; background:var(--bg-color); border-radius:6px; display:flex; justify-content:space-between; align-items:center;';
   div.innerHTML = `
     <span>📄 <strong>${file.originalname}</strong></span>
-    <a href="${file.path}" target="_blank" download class="btn-small btn-success" style="text-decoration:none;">Baixar</a>
+    <a href="${file.path}" target="_blank" download class="btn-small btn-success" style="text-decoration:none; padding:4px 8px;">Baixar</a>
   `;
   container.appendChild(div);
 }

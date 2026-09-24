@@ -78,14 +78,6 @@ function obterDataHoraBR() {
   };
 }
 
-function registrarAcessoEAtendimento() {
-  const dh = obterDataHoraBR();
-  statsGeral.totalGeralAcessos = (statsGeral.totalGeralAcessos || 0) + 1;
-  statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
-  statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
-  salvarStats(statsGeral);
-}
-
 function obterMedicosComStatus() {
   const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
   return medicos.map(m => ({
@@ -97,19 +89,6 @@ function obterMedicosComStatus() {
     statusCadastro: m.status,
     isOnline: cpfsOnline.has(m.cpf)
   }));
-}
-
-function obterDadosAdminPayload() {
-  const dh = obterDataHoraBR();
-  return {
-    medicos: obterMedicosComStatus(),
-    logsConsultas,
-    registroPacientesGeral,
-    atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
-    atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
-    totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
-    filaAtualCount: filaPacientes.length
-  };
 }
 
 // Upload de Arquivos
@@ -139,7 +118,6 @@ app.post('/api/medico/cadastro', (req, res) => {
     salvarMedicos(medicos);
 
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
     res.json({ success: true, message: 'Cadastro enviado com sucesso! Aguarde aprovação do Admin.' });
   } catch (err) {
     console.error("Erro no cadastro:", err);
@@ -161,7 +139,16 @@ app.post('/api/medico/login', (req, res) => {
 
 // Admin Endpoints
 app.get('/api/admin/dados', (req, res) => {
-  res.json(obterDadosAdminPayload());
+  const dh = obterDataHoraBR();
+  res.json({
+    medicos: obterMedicosComStatus(),
+    logsConsultas,
+    registroPacientesGeral,
+    atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+    atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
+    totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
+    filaAtualCount: filaPacientes.length
+  });
 });
 
 app.post('/api/admin/medico/status', (req, res) => {
@@ -171,19 +158,18 @@ app.post('/api/admin/medico/status', (req, res) => {
     medico.status = novoStatus;
     salvarMedicos(medicos);
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
     res.json({ success: true });
   } else {
     res.status(404).json({ error: 'Médico não encontrado.' });
   }
 });
 
+// Excluir médico pelo Admin
 app.post('/api/admin/medico/excluir', (req, res) => {
   const { medicoId } = req.body;
   medicos = medicos.filter(m => m.id !== medicoId);
   salvarMedicos(medicos);
   io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
   res.json({ success: true, message: 'Médico excluído com sucesso.' });
 });
 
@@ -193,11 +179,16 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
   res.status(404).send('Arquivo não encontrado.');
 });
 
+// [CORREÇÃO]: Contabilização de estatísticas e salvamento seguro de logs/zip
 function processarFinalizacaoConsulta(dados) {
   try {
-    registrarAcessoEAtendimento();
     const dh = obterDataHoraBR();
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
+
+    // Atualiza contadores de relatórios no servidor
+    statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
+    statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
+    salvarStats(statsGeral);
 
     const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
     const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
@@ -247,18 +238,28 @@ function processarFinalizacaoConsulta(dados) {
           const pGeral = registroPacientesGeral.find(p => p.cpf === paciente?.cpf);
           if (pGeral) pGeral.status = 'Atendido';
 
-          io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
+          io.emit('atualizar-admin-dashboard', {
+            logsConsultas,
+            atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+            atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
+            totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
+            registroPacientesGeral,
+            filaAtualCount: filaPacientes.length
+          });
         });
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error('Erro no ZIP:', e); }
     });
-  } catch (err) { console.error(err); }
+  } catch (err) { console.error('Erro geral ao finalizar consulta:', err); }
 }
 
-// WebSockets & Sinalização WebRTC com Suporte TURN
+// WebSockets (Sinalização WebRTC)
 io.on('connection', (socket) => {
+  // Contabiliza visitas/acessos no dashboard
+  statsGeral.totalGeralAcessos += 1;
+  salvarStats(statsGeral);
+
   socket.emit('atualizar-fila', filaPacientes);
   socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  socket.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
 
   socket.on('medico-online', (medico) => {
     medicosOnline.set(socket.id, medico);
@@ -282,7 +283,10 @@ io.on('connection', (socket) => {
     registroPacientesGeral.push(paciente);
     
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
+    io.emit('atualizar-admin-pacientes', {
+      registroPacientesGeral,
+      filaAtualCount: filaPacientes.length
+    });
   });
 
   socket.on('chamar-paciente', (dadosChamada) => {
@@ -307,26 +311,37 @@ io.on('connection', (socket) => {
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
+    io.emit('atualizar-admin-pacientes', {
+      registroPacientesGeral,
+      filaAtualCount: filaPacientes.length
+    });
     
+    // [CORREÇÃO]: Garante envio do medicoSocketId para o paciente poder direcionar as ofertas WebRTC
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
+      sender: socket.id,
       sessionId,
       medicoInfo: dadosConsulta.medico
     });
   });
 
-  // Troca das Ofertas e Respostas do WebRTC
+  // [CORREÇÃO]: Repasse estrito de eventos de sinalização P2P (WebRTC)
   socket.on('webrtc-offer', (data) => {
-    io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
+    if (data && data.target) {
+      io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
+    }
   });
 
   socket.on('webrtc-answer', (data) => {
-    io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp });
+    if (data && data.target) {
+      io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp });
+    }
   });
 
   socket.on('webrtc-ice-candidate', (data) => {
-    io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
+    if (data && data.target) {
+      io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
+    }
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
@@ -342,16 +357,17 @@ io.on('connection', (socket) => {
 
   socket.on('finalizar-consulta', (dados) => {
     const consulta = consultasAtivas.get(socket.id);
-    const payload = consulta || { sessionId: Date.now().toString(), medico: {}, paciente: {} };
-    if (dados && dados.anamnese) payload.anamnese = dados.anamnese;
+    if (!consulta) return;
 
-    processarFinalizacaoConsulta(payload);
+    if (dados && dados.anamnese) consulta.anamnese = dados.anamnese;
 
-    if (payload.pacienteSocketId) io.to(payload.pacienteSocketId).emit('consulta-encerrada');
-    if (payload.medicoSocketId) io.to(payload.medicoSocketId).emit('consulta-encerrada');
+    processarFinalizacaoConsulta(consulta);
 
-    consultasAtivas.delete(payload.medicoSocketId);
-    consultasAtivas.delete(payload.pacienteSocketId);
+    if (consulta.pacienteSocketId) io.to(consulta.pacienteSocketId).emit('consulta-encerrada');
+    if (consulta.medicoSocketId) io.to(consulta.medicoSocketId).emit('consulta-encerrada');
+
+    consultasAtivas.delete(consulta.medicoSocketId);
+    consultasAtivas.delete(consulta.pacienteSocketId);
   });
 
   socket.on('disconnect', () => {
@@ -363,7 +379,9 @@ io.on('connection', (socket) => {
       processarFinalizacaoConsulta(consulta);
 
       const outroSocketId = socket.id === consulta.medicoSocketId ? consulta.pacienteSocketId : consulta.medicoSocketId;
-      io.to(outroSocketId).emit('parceiro-desconectou');
+      if (outroSocketId) {
+        io.to(outroSocketId).emit('parceiro-desconectou');
+      }
 
       consultasAtivas.delete(consulta.medicoSocketId);
       consultasAtivas.delete(consulta.pacienteSocketId);
@@ -371,7 +389,6 @@ io.on('connection', (socket) => {
 
     io.emit('atualizar-fila', filaPacientes);
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
   });
 });
 
