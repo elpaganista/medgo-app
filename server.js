@@ -147,16 +147,6 @@ app.post('/api/admin/medico/status', (req, res) => {
   }
 });
 
-app.post('/api/admin/limpar-historico', (req, res) => {
-  const { tipo } = req.body;
-  if (tipo === 'pacientes') registroPacientesGeral = [];
-  else if (tipo === 'stats') {
-    statsGeral = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
-    salvarStats(statsGeral);
-  } else if (tipo === 'logs') logsConsultas = [];
-  res.json({ success: true });
-});
-
 app.get('/api/admin/download-log/:sessionId', (req, res) => {
   const zipPath = path.join(__dirname, 'logs', `consulta-${req.params.sessionId}.zip`);
   if (fs.existsSync(zipPath)) return res.download(zipPath);
@@ -235,7 +225,7 @@ function processarFinalizacaoConsulta(dados) {
   }
 }
 
-// WebSockets
+// WebSockets & Sinalização WebRTC Nativa (Sem PeerJS Externa)
 io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
 
@@ -289,6 +279,19 @@ io.on('connection', (socket) => {
       sessionId,
       medicoInfo: dadosConsulta.medico
     });
+  });
+
+  // Troca de Sinais WebRTC (Offer, Answer, ICE Candidate)
+  socket.on('webrtc-offer', (data) => {
+    io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
+  });
+
+  socket.on('webrtc-answer', (data) => {
+    io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp });
+  });
+
+  socket.on('webrtc-ice-candidate', (data) => {
+    io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
   });
 
   socket.on('novo-arquivo-enviado', (data) => {

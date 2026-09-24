@@ -6,7 +6,6 @@
   <title>MedGo - Telemedicina Inteligente</title>
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="stylesheet" href="/css/style.css">
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
@@ -21,7 +20,7 @@
     </div>
   </header>
 
-  <!-- Navegação por Abas Principais -->
+  <!-- Navegação por Abas Principais (Sempre visível para alternar) -->
   <nav class="tabs-nav" id="main-nav-tabs">
     <button class="tab-btn active" data-tab="paciente" id="nav-btn-paciente">Área do Paciente</button>
     <button class="tab-btn" data-tab="medico" id="nav-btn-medico">Área Médica</button>
@@ -65,8 +64,8 @@
       <div class="card centralizado hidden" id="lobby-paciente">
         <div class="lobby-content">
           <h2>Sala de Espera Virtual</h2>
-          <p>Você está na fila de atendimento. Por favor, mantenha esta tela aberta. O médico iniciará sua chamada em breve...</p>
-          <div class="status-badge">Aguardando médico...</div>
+          <p>Você está na fila de atendimento. Mantenha esta tela aberta. O médico iniciará sua chamada em breve...</p>
+          <div class="status-badge" style="margin-top:15px; padding:10px; background:var(--primary); color:white; border-radius:8px; text-align:center;">Aguardando médico...</div>
         </div>
       </div>
     </section>
@@ -91,9 +90,6 @@
             <input type="password" id="med-login-senha" placeholder="Sua senha" required>
           </div>
           <button type="submit" class="btn-primary">Acessar Painel</button>
-          <p style="text-align:center; margin-top:12px;">
-            <a href="#" id="link-esqueci-senha" style="color:var(--cyan); font-size:0.85rem; text-decoration:none;">Esqueceu sua senha?</a>
-          </p>
         </form>
 
         <!-- Form Cadastro Médico -->
@@ -120,24 +116,6 @@
             <input type="password" id="med-cad-senha" placeholder="Crie uma senha" required>
           </div>
           <button type="submit" class="btn-secondary">Enviar Cadastro para Aprovação</button>
-        </form>
-
-        <!-- Form Recuperar Senha -->
-        <form id="form-recuperar-senha" class="hidden">
-          <h3>Recuperar Senha</h3>
-          <p style="font-size:0.85rem; color:var(--text-muted);">Digite o e-mail cadastrado e sua nova senha para redefinir o acesso.</p>
-          <div class="input-group">
-            <label for="rec-email">E-mail Cadastrado</label>
-            <input type="email" id="rec-email" placeholder="seu@email.com" required>
-          </div>
-          <div class="input-group">
-            <label for="rec-nova-senha">Nova Senha</label>
-            <input type="password" id="rec-nova-senha" placeholder="Digite a nova senha" required>
-          </div>
-          <button type="submit" class="btn-primary">Redefinir Senha</button>
-          <p style="text-align:center; margin-top:12px;">
-            <a href="#" id="link-voltar-login" style="color:var(--text-muted); font-size:0.85rem; text-decoration:none;">← Voltar ao Login</a>
-          </p>
         </form>
       </div>
 
@@ -201,7 +179,6 @@
 
         <div style="display:flex; gap:10px; justify-content:flex-end; margin-bottom:10px; flex-wrap:wrap;">
           <a href="/api/admin/download-relatorio-diario" class="btn-small btn-success" style="padding:8px 12px; text-decoration:none;">📦 Baixar Relatório Diário (.ZIP)</a>
-          <button class="btn-small btn-danger" style="padding:8px 12px;" onclick="limparBancoDados('stats')">🗑️ Resetar Contadores</button>
         </div>
 
         <hr class="divider">
@@ -214,8 +191,7 @@
         <hr class="divider">
 
         <div class="admin-section flex-between">
-          <h3>Registro de Pacientes (Acompanhamento)</h3>
-          <button class="btn-small btn-danger" onclick="limparBancoDados('pacientes')">Limpar Lista Pacientes</button>
+          <h3>Registro de Pacientes</h3>
         </div>
         <div id="lista-pacientes-admin" class="admin-list-box"></div>
 
@@ -223,7 +199,6 @@
 
         <div class="admin-section flex-between">
           <h3>Histórico de Consultas & Log ZIP</h3>
-          <button class="btn-small btn-danger" onclick="limparBancoDados('logs')">Limpar Histórico ZIPs</button>
         </div>
         <ul id="lista-logs-consultas" class="admin-list"></ul>
       </div>
@@ -238,19 +213,19 @@
       <div class="grid-consulta">
         
         <div class="video-container">
-          <!-- Vídeo Remoto (Quadrado e Grande) -->
+          <!-- Vídeo Remoto (A pessoa com quem você fala) -->
           <div class="video-box main-video">
             <span class="badge" id="label-remote-video">Vídeo Remoto</span>
             <video id="remote-video" autoplay playsinline webkit-playsinline></video>
           </div>
 
-          <!-- Vídeo Local (Quadrado e Grande) -->
+          <!-- Vídeo Local (Você) -->
           <div class="video-box sub-video">
             <span class="badge" id="label-local-video">Seu Vídeo</span>
             <video id="local-video" autoplay muted playsinline webkit-playsinline></video>
           </div>
 
-          <!-- Controles de Mídia (Ativar/Desativar Câmera e Microfone) -->
+          <!-- Controles de Mídia -->
           <div class="video-controls">
             <button id="btn-toggle-mic" class="btn-control">🎤 Microfone On</button>
             <button id="btn-toggle-cam" class="btn-control">📷 Câmera On</button>
