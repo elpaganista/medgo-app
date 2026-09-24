@@ -79,7 +79,7 @@ body {
 }
 
 .tabs-nav {
-  display: flex;
+  display: flex !important;
   justify-content: center;
   gap: 10px;
   padding: 1rem;
@@ -123,6 +123,55 @@ body {
 .centralizado {
   max-width: 480px;
   margin: 2rem auto;
+}
+
+/* Layout com Lateral (Sidebar) do Paciente */
+.paciente-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media(min-width: 850px) {
+  .paciente-grid {
+    grid-template-columns: 320px 1fr;
+  }
+}
+
+.sidebar-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+  height: fit-content;
+}
+
+.medico-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background: var(--bg-color);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.status-indicator.online {
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.status-indicator.offline {
+  background-color: #ef4444;
 }
 
 .input-group {
@@ -177,24 +226,6 @@ textarea {
   margin-bottom: 1rem;
   font-weight: 600;
   text-align: center;
-}
-
-/* Status do Médico (Bolinha Verde) */
-.status-indicator {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-right: 6px;
-}
-
-.status-indicator.online {
-  background-color: #10b981;
-  box-shadow: 0 0 8px #10b981;
-}
-
-.status-indicator.offline {
-  background-color: #64748b;
 }
 
 /* Grid de Consulta */
@@ -357,6 +388,7 @@ textarea {
   border: none;
   cursor: pointer;
   font-size: 0.8rem;
+  margin-left: 4px;
 }
 
 .btn-success { background: var(--secondary); color: white; }

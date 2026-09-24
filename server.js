@@ -18,6 +18,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -64,7 +65,7 @@ let statsGeral = carregarStats();
 let filaPacientes = [];
 let registroPacientesGeral = [];
 let consultasAtivas = new Map();
-let medicosOnline = new Map(); // socket.id -> medico
+let medicosOnline = new Map();
 let logsConsultas = [];
 
 function obterDataHoraBR() {
@@ -77,12 +78,17 @@ function obterDataHoraBR() {
   };
 }
 
-function registrarAcessoEAtendimento() {
-  const dh = obterDataHoraBR();
-  statsGeral.totalGeralAcessos = (statsGeral.totalGeralAcessos || 0) + 1;
-  statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
-  statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
-  salvarStats(statsGeral);
+function obterMedicosComStatus() {
+  const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
+  return medicos.map(m => ({
+    id: m.id,
+    nome: m.nome,
+    crm: m.crm,
+    cpf: m.cpf,
+    email: m.email,
+    statusCadastro: m.status,
+    isOnline: cpfsOnline.has(m.cpf)
+  }));
 }
 
 // Upload de Arquivos
@@ -95,18 +101,28 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   });
 });
 
-// Cadastro de Médico
+// Cadastro de Médico (Corrigido)
 app.post('/api/medico/cadastro', (req, res) => {
-  const { nome, cpf, email, crm, senha } = req.body;
-  if (medicos.find(m => m.cpf === cpf)) {
-    return res.status(400).json({ error: 'Este CPF já está cadastrado no sistema.' });
-  }
-  const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
-  medicos.push(novoMedico);
-  salvarMedicos(medicos);
+  try {
+    const { nome, cpf, email, crm, senha } = req.body;
+    if (!nome || !cpf || !crm || !senha) {
+      return res.status(400).json({ error: 'Preencha todos os campos obrigatórios.' });
+    }
+    
+    if (medicos.find(m => m.cpf === cpf)) {
+      return res.status(400).json({ error: 'Este CPF já está cadastrado.' });
+    }
 
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  res.json({ success: true, message: 'Cadastro enviado para aprovação do Administrador.' });
+    const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
+    medicos.push(novoMedico);
+    salvarMedicos(medicos);
+
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    res.json({ success: true, message: 'Cadastro enviado com sucesso! Aguarde aprovação do Admin.' });
+  } catch (err) {
+    console.error("Erro no cadastro:", err);
+    res.status(500).json({ error: 'Erro interno ao realizar cadastro.' });
+  }
 });
 
 // Login do Médico
@@ -120,18 +136,6 @@ app.post('/api/medico/login', (req, res) => {
 
   res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
-
-function obterMedicosComStatus() {
-  const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
-  return medicos.map(m => ({
-    id: m.id,
-    nome: m.nome,
-    crm: m.crm,
-    cpf: m.cpf,
-    statusCadastro: m.status,
-    isOnline: cpfsOnline.has(m.cpf)
-  }));
-}
 
 // Admin Endpoints
 app.get('/api/admin/dados', (req, res) => {
@@ -160,6 +164,15 @@ app.post('/api/admin/medico/status', (req, res) => {
   }
 });
 
+// EXCLUIR MÉDICO PELO ADMIN
+app.post('/api/admin/medico/excluir', (req, res) => {
+  const { medicoId } = req.body;
+  medicos = medicos.filter(m => m.id !== medicoId);
+  salvarMedicos(medicos);
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  res.json({ success: true, message: 'Médico excluído com sucesso.' });
+});
+
 app.get('/api/admin/download-log/:sessionId', (req, res) => {
   const zipPath = path.join(__dirname, 'logs', `consulta-${req.params.sessionId}.zip`);
   if (fs.existsSync(zipPath)) return res.download(zipPath);
@@ -168,7 +181,6 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
 
 function processarFinalizacaoConsulta(dados) {
   try {
-    registrarAcessoEAtendimento();
     const dh = obterDataHoraBR();
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
@@ -229,16 +241,12 @@ function processarFinalizacaoConsulta(dados) {
             filaAtualCount: filaPacientes.length
           });
         });
-      } catch (e) {
-        console.error("Erro ZIP:", e);
-      }
+      } catch (e) { console.error(e); }
     });
-  } catch (err) {
-    console.error("Erro finalização:", err);
-  }
+  } catch (err) { console.error(err); }
 }
 
-// WebSockets & Sinalização
+// WebSockets
 io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
   socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
@@ -305,7 +313,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Sinalização WebRTC Direta
   socket.on('webrtc-offer', (data) => {
     io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
   });
@@ -360,10 +367,6 @@ io.on('connection', (socket) => {
 
     io.emit('atualizar-fila', filaPacientes);
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-    io.emit('atualizar-admin-pacientes', {
-      registroPacientesGeral,
-      filaAtualCount: filaPacientes.length
-    });
   });
 });
 

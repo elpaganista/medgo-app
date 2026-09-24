@@ -9,14 +9,11 @@ let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
 
-// Servidores STUN/TURN de Conectividade Global
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    { urls: 'stun:stun2.l.google.com:19302' }
   ]
 };
 
@@ -54,7 +51,7 @@ function salvarMedicoLocal(medico) {
   else localStorage.removeItem('medgo_medico_sessao');
 }
 
-// Tema Claro / Escuro
+// Tema
 const btnTema = document.getElementById('btn-tema');
 if (btnTema) {
   btnTema.addEventListener('click', () => {
@@ -63,7 +60,7 @@ if (btnTema) {
   });
 }
 
-// Controle de Navegação por Abas
+// Controle de Navegação das Abas (Sempre Visíveis)
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -77,14 +74,6 @@ tabButtons.forEach(btn => {
     if (target) target.classList.remove('hidden');
   });
 });
-
-function ocultarAbasNavegacao() {
-  document.getElementById('main-nav-tabs').classList.add('hidden');
-}
-
-function exibirAbasNavegacao() {
-  document.getElementById('main-nav-tabs').classList.remove('hidden');
-}
 
 // Captura de Mídia
 async function obterMidiaLocal() {
@@ -102,13 +91,12 @@ async function obterMidiaLocal() {
     }
     return localStream;
   } catch (err) {
-    alert('Permita o acesso à Câmera e ao Microfone no seu navegador.');
+    alert('Permita o acesso à Câmera e Microfone para realizar a consulta.');
     console.error('Erro de mídia:', err);
     return null;
   }
 }
 
-// Conexão WebRTC
 function criarPeerConnection(outroSocketId) {
   peerConnection = new RTCPeerConnection(rtcConfig);
 
@@ -153,80 +141,60 @@ socket.on('webrtc-answer', async (data) => {
 
 socket.on('webrtc-ice-candidate', async (data) => {
   if (peerConnection && data.candidate) {
-    try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    } catch (e) {
-      console.error('Erro Candidate:', e);
-    }
+    try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {}
   }
 });
 
-// Controles Mic/Cam
-const btnToggleMic = document.getElementById('btn-toggle-mic');
-const btnToggleCam = document.getElementById('btn-toggle-cam');
-
-if (btnToggleMic) {
-  btnToggleMic.addEventListener('click', () => {
-    if (localStream && localStream.getAudioTracks().length > 0) {
-      micAtivo = !micAtivo;
-      localStream.getAudioTracks()[0].enabled = micAtivo;
-      btnToggleMic.innerText = micAtivo ? '🎤 Microfone On' : '🎙️ Microfone Off';
-      btnToggleMic.classList.toggle('off', !micAtivo);
-    }
-  });
-}
-
-if (btnToggleCam) {
-  btnToggleCam.addEventListener('click', () => {
-    if (localStream && localStream.getVideoTracks().length > 0) {
-      camAtiva = !camAtiva;
-      localStream.getVideoTracks()[0].enabled = camAtiva;
-      btnToggleCam.innerText = camAtiva ? '📷 Câmera On' : '📷 Câmera Off';
-      btnToggleCam.classList.toggle('off', !camAtiva);
-    }
-  });
-}
-
-// Lista de Médicos com Bolinha Verde
+// Lista de Médicos na Sidebar Lateral
 socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   const containerPaciente = document.getElementById('lista-medicos-status-paciente');
   if (containerPaciente) {
     const aprovados = listaMedicos.filter(m => m.statusCadastro === 'aprovado');
     if (aprovados.length === 0) {
-      containerPaciente.innerHTML = '<p style="color:var(--text-muted);">Nenhum médico cadastrado no momento.</p>';
+      containerPaciente.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Nenhum médico aprovado no momento.</p>';
     } else {
       containerPaciente.innerHTML = aprovados.map(m => `
-        <div style="margin-bottom:4px; display:flex; align-items:center;">
-          <span class="status-indicator ${m.isOnline ? 'online' : 'offline'}"></span>
-          <strong>Dr(a). ${m.nome}</strong> (CRM: ${m.crm}) - <em style="margin-left:4px;">${m.isOnline ? 'Online' : 'Offline'}</em>
+        <div class="medico-status-item">
+          <div>
+            <strong>Dr(a). ${m.nome}</strong><br>
+            <small style="color:var(--text-muted);">CRM: ${m.crm}</small>
+          </div>
+          <span class="status-indicator ${m.isOnline ? 'online' : 'offline'}" title="${m.isOnline ? 'Online' : 'Offline'}"></span>
         </div>
       `).join('');
     }
   }
+
+  // Renderizar Médicos na Gestão Admin
+  renderMedicosAdmin(listaMedicos);
 });
 
-// Login e Sessão Médica
-const formLoginMedico = document.getElementById('form-login-medico');
+// Cadastro de Médico (Garantido)
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
-const btnMedLoginView = document.getElementById('btn-med-login-view');
-const btnMedCadView = document.getElementById('btn-med-cad-view');
+if (formCadastroMedico) {
+  formCadastroMedico.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const dados = {
+      nome: document.getElementById('med-cad-nome').value,
+      cpf: document.getElementById('med-cad-cpf').value,
+      email: document.getElementById('med-cad-email').value,
+      crm: document.getElementById('med-cad-crm').value,
+      senha: document.getElementById('med-cad-senha').value,
+    };
 
-if (btnMedLoginView && btnMedCadView) {
-  btnMedLoginView.addEventListener('click', () => {
-    btnMedLoginView.classList.add('active');
-    btnMedCadView.classList.remove('active');
-    formLoginMedico.classList.remove('hidden');
-    formCadastroMedico.classList.add('hidden');
-  });
-
-  btnMedCadView.addEventListener('click', () => {
-    btnMedCadView.classList.add('active');
-    btnMedLoginView.classList.remove('active');
-    formCadastroMedico.classList.remove('hidden');
-    formLoginMedico.classList.add('hidden');
+    const res = await fetch('/api/medico/cadastro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados)
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+    if (res.ok) formCadastroMedico.reset();
   });
 }
 
+// Login Médico
+const formLoginMedico = document.getElementById('form-login-medico');
 if (formLoginMedico) {
   formLoginMedico.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -257,14 +225,26 @@ function ativarPainelMedico(medico) {
   
   document.getElementById('box-medico-auth').classList.add('hidden');
   document.getElementById('dashboard-medico').classList.remove('hidden');
-  ocultarAbasNavegacao();
 }
 
-const medicoSalvo = obterMedicoSalvoLocal();
-if (medicoSalvo) {
-  medSessaoAtiva = medicoSalvo;
-  socket.emit('medico-online', medicoSalvo);
-  ativarPainelMedico(medicoSalvo);
+// Alternar entre Login e Cadastro na aba Médica
+const btnMedLoginView = document.getElementById('btn-med-login-view');
+const btnMedCadView = document.getElementById('btn-med-cad-view');
+
+if (btnMedLoginView && btnMedCadView) {
+  btnMedLoginView.addEventListener('click', () => {
+    btnMedLoginView.classList.add('active');
+    btnMedCadView.classList.remove('active');
+    formLoginMedico.classList.remove('hidden');
+    formCadastroMedico.classList.add('hidden');
+  });
+
+  btnMedCadView.addEventListener('click', () => {
+    btnMedCadView.classList.add('active');
+    btnMedLoginView.classList.remove('active');
+    formCadastroMedico.classList.remove('hidden');
+    formLoginMedico.classList.add('hidden');
+  });
 }
 
 // Logoff Médico
@@ -276,11 +256,10 @@ if (btnLogoutMed) {
     salvarMedicoLocal(null);
     document.getElementById('dashboard-medico').classList.add('hidden');
     document.getElementById('box-medico-auth').classList.remove('hidden');
-    exibirAbasNavegacao();
   });
 }
 
-// Login Admin RESTAURADO
+// Login Admin
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
   formAdmin.addEventListener('submit', (e) => {
@@ -306,7 +285,7 @@ if (btnLogoutAdmin) {
   });
 }
 
-// Fila de Pacientes
+// Fila do Paciente
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -322,7 +301,6 @@ if (formPac) {
     socket.emit('entrar-fila', dados);
     document.getElementById('form-paciente-box').classList.add('hidden');
     document.getElementById('lobby-paciente').classList.remove('hidden');
-    ocultarAbasNavegacao();
   });
 }
 
@@ -374,7 +352,6 @@ socket.on('chamado-para-consulta', (dados) => {
 
 function configurarInterfaceConsulta(isDoctor) {
   document.getElementById('sala-consulta').classList.remove('hidden');
-  ocultarAbasNavegacao();
 
   if (isDoctor) {
     document.getElementById('anamnese-box').classList.remove('hidden');
@@ -389,7 +366,7 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Finalização de Consulta
+// Finalização
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou.');
   limparEVoltarLobby();
@@ -426,7 +403,6 @@ function limparEVoltarLobby() {
     document.getElementById('tab-paciente').classList.remove('hidden');
     document.getElementById('lobby-paciente').classList.add('hidden');
     document.getElementById('form-paciente-box').classList.remove('hidden');
-    exibirAbasNavegacao();
   }
 }
 
@@ -439,7 +415,7 @@ if (btnEncerrar) {
   });
 }
 
-// Painel Admin
+// Painel Admin & Exclusão de Médico
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
@@ -451,4 +427,54 @@ function renderAdminDashboard(data) {
   document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
   document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
   document.getElementById('count-admin-fila').innerText = data.filaAtualCount || 0;
+  renderMedicosAdmin(data.medicos);
 }
+
+function renderMedicosAdmin(medicos) {
+  const container = document.getElementById('lista-medicos-admin');
+  if (!container) return;
+  if (!medicos || medicos.length === 0) {
+    container.innerHTML = '<p class="empty-msg">Nenhum médico cadastrado.</p>';
+    return;
+  }
+
+  container.innerHTML = medicos.map(m => `
+    <div class="item-row" style="flex-wrap:wrap; gap:8px;">
+      <div>
+        <strong>${m.nome}</strong> (CRM: ${m.crm}) - Status: <em>${m.statusCadastro.toUpperCase()}</em>
+      </div>
+      <div>
+        ${m.statusCadastro === 'pendente' ? `
+          <button class="btn-small btn-success" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Aprovar</button>
+          <button class="btn-small btn-warn" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Negar</button>
+        ` : ''}
+        ${m.statusCadastro === 'aprovado' ? `
+          <button class="btn-small btn-warn" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Bloquear</button>
+        ` : ''}
+        ${m.statusCadastro === 'bloqueado' ? `
+          <button class="btn-small btn-success" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Desbloquear</button>
+        ` : ''}
+        <button class="btn-small btn-danger" onclick="excluirMedicoAdmin('${m.id}')">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.alterarStatusMedico = async (medicoId, novoStatus) => {
+  await fetch('/api/admin/medico/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ medicoId, novoStatus })
+  });
+  carregarDadosAdmin();
+};
+
+window.excluirMedicoAdmin = async (medicoId) => {
+  if (!confirm('Deseja realmente excluir este médico do sistema?')) return;
+  await fetch('/api/admin/medico/excluir', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ medicoId })
+  });
+  carregarDadosAdmin();
+};

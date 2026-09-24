@@ -20,7 +20,7 @@
     </div>
   </header>
 
-  <!-- Navegação por Abas Principais -->
+  <!-- Navegação por Abas Principais (Sempre Visível no Topo) -->
   <nav class="tabs-nav" id="main-nav-tabs">
     <button class="tab-btn active" data-tab="paciente" id="nav-btn-paciente">Área do Paciente</button>
     <button class="tab-btn" data-tab="medico" id="nav-btn-medico">Área Médica</button>
@@ -29,45 +29,50 @@
 
   <main class="container">
     
-    <!-- 1. ABA PACIENTE -->
+    <!-- 1. ABA PACIENTE COM SIDEBAR DE MÉDICOS -->
     <section id="tab-paciente" class="tab-content active">
-      <div class="card centralizado" id="form-paciente-box">
-        <div class="card-header">
-          <h2>Atendimento MedGo</h2>
-          <p>Preencha seus dados para entrar na fila de consulta</p>
-        </div>
+      <div class="paciente-grid">
         
-        <!-- Lista de Médicos Cadastrados e Status Online -->
-        <div style="margin: 1rem 0; padding: 12px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border);">
-          <h4 style="font-size:0.9rem; color:var(--text-muted); margin-bottom:8px;">Médicos na Plataforma:</h4>
-          <div id="lista-medicos-status-paciente" style="font-size:0.85rem;">
-            <p style="color:var(--text-muted);">Carregando lista de médicos...</p>
+        <!-- Sidebar Lateral com Médicos Cadastrados e Status Online -->
+        <aside class="sidebar-card">
+          <h3 style="font-size:1rem; margin-bottom:12px; color:var(--primary);">🩺 Corpo Médico:</h3>
+          <div id="lista-medicos-status-paciente">
+            <p style="color:var(--text-muted); font-size:0.85rem;">Carregando médicos...</p>
           </div>
+        </aside>
+
+        <!-- Formulário de Entrada do Paciente -->
+        <div class="card" id="form-paciente-box" style="margin:0;">
+          <div class="card-header">
+            <h2>Atendimento MedGo</h2>
+            <p>Preencha seus dados para entrar na fila de consulta</p>
+          </div>
+
+          <form id="form-paciente">
+            <div class="input-group">
+              <label for="pac-nome">Nome Completo</label>
+              <input type="text" id="pac-nome" placeholder="Ex: João da Silva" required>
+            </div>
+            <div class="input-group">
+              <label for="pac-cpf">CPF</label>
+              <input type="text" id="pac-cpf" placeholder="000.000.000-00" maxlength="14" required>
+            </div>
+            <div class="input-group">
+              <label for="pac-endereco">Endereço Completo</label>
+              <input type="text" id="pac-endereco" placeholder="Rua, Número, Bairro" required>
+            </div>
+            <div class="input-group">
+              <label for="pac-telefone">Telefone / WhatsApp</label>
+              <input type="tel" id="pac-telefone" placeholder="(00) 90000-0000" maxlength="15" required>
+            </div>
+            <div class="input-group">
+              <label for="pac-email">E-mail</label>
+              <input type="email" id="pac-email" placeholder="seu@email.com" required>
+            </div>
+            <button type="submit" class="btn-primary">Entrar na Sala de Espera</button>
+          </form>
         </div>
 
-        <form id="form-paciente">
-          <div class="input-group">
-            <label for="pac-nome">Nome Completo</label>
-            <input type="text" id="pac-nome" placeholder="Ex: João da Silva" required>
-          </div>
-          <div class="input-group">
-            <label for="pac-cpf">CPF</label>
-            <input type="text" id="pac-cpf" placeholder="000.000.000-00" maxlength="14" required>
-          </div>
-          <div class="input-group">
-            <label for="pac-endereco">Endereço Completo</label>
-            <input type="text" id="pac-endereco" placeholder="Rua, Número, Bairro" required>
-          </div>
-          <div class="input-group">
-            <label for="pac-telefone">Telefone / WhatsApp</label>
-            <input type="tel" id="pac-telefone" placeholder="(00) 90000-0000" maxlength="15" required>
-          </div>
-          <div class="input-group">
-            <label for="pac-email">E-mail</label>
-            <input type="email" id="pac-email" placeholder="seu@email.com" required>
-          </div>
-          <button type="submit" class="btn-primary">Entrar na Sala de Espera</button>
-        </form>
       </div>
 
       <div class="card centralizado hidden" id="lobby-paciente">
@@ -101,7 +106,7 @@
           <button type="submit" class="btn-primary">Acessar Painel</button>
         </form>
 
-        <!-- Form Cadastro Médico -->
+        <!-- Form Cadastro Médico (Totalmente Corrigido) -->
         <form id="form-cadastro-medico" class="hidden">
           <h3>Cadastro de Profissional</h3>
           <div class="input-group">
@@ -222,19 +227,16 @@
       <div class="grid-consulta">
         
         <div class="video-container">
-          <!-- Vídeo Remoto -->
           <div class="video-box main-video">
             <span class="badge" id="label-remote-video">Vídeo Remoto</span>
             <video id="remote-video" autoplay playsinline webkit-playsinline></video>
           </div>
 
-          <!-- Vídeo Local -->
           <div class="video-box sub-video">
             <span class="badge" id="label-local-video">Seu Vídeo</span>
             <video id="local-video" autoplay muted playsinline webkit-playsinline></video>
           </div>
 
-          <!-- Controles de Mídia -->
           <div class="video-controls">
             <button id="btn-toggle-mic" class="btn-control">🎤 Microfone On</button>
             <button id="btn-toggle-cam" class="btn-control">📷 Câmera On</button>
