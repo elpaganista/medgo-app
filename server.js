@@ -6,7 +6,7 @@ const fs = require('fs');
 const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const archiver = require('archiver');
-const twilio = require('twilio');
+const { ExpressPeerServer } = require('peer');
 
 process.env.TZ = 'America/Fortaleza';
 
@@ -17,6 +17,12 @@ const io = new Server(server, {
   pingTimeout: 60000,
   pingInterval: 25000
 });
+
+// Servidor de sinalização de vídeo (PeerJS), usado pelo front-end para
+// estabelecer as chamadas médico <-> paciente via WebRTC.
+// Roda no mesmo servidor HTTP/porta do resto do app, sem infra extra.
+const peerServer = ExpressPeerServer(server, { path: '/' });
+app.use('/peerjs', peerServer);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -91,31 +97,6 @@ function obterMedicosComStatus() {
     isOnline: cpfsOnline.has(m.cpf)
   }));
 }
-
-// ENDPOINT SEGURO DO TWILIO (Usando variáveis de ambiente)
-app.get('/api/get-turn-credentials', async (req, res) => {
-  try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-    if (!accountSid || !authToken) {
-      throw new Error("Credenciais da Twilio não configuradas no ambiente.");
-    }
-    
-    const client = twilio(accountSid, authToken);
-    const token = await client.tokens.create();
-
-    res.json({ iceServers: token.iceServers });
-  } catch (error) {
-    console.warn('Usando fallback público do WebRTC:', error.message);
-    res.json({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelay', credential: 'openrelay' }
-      ]
-    });
-  }
-});
 
 // Upload de Arquivos
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
@@ -344,24 +325,6 @@ io.on('connection', (socket) => {
       sessionId,
       medicoInfo: dadosConsulta.medico
     });
-  });
-
-  socket.on('webrtc-offer', (data) => {
-    if (data && data.target) {
-      io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
-    }
-  });
-
-  socket.on('webrtc-answer', (data) => {
-    if (data && data.target) {
-      io.to(data.target).emit('webrtc-answer', { sender: socket.id, sdp: data.sdp });
-    }
-  });
-
-  socket.on('webrtc-ice-candidate', (data) => {
-    if (data && data.target) {
-      io.to(data.target).emit('webrtc-ice-candidate', { sender: socket.id, candidate: data.candidate });
-    }
   });
 
   socket.on('novo-arquivo-enviado', (data) => {

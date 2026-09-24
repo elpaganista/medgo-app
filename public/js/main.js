@@ -1,39 +1,88 @@
 const socket = io();
 
 let localStream = null;
-let peerConnection = null;
+let peer = null;
+let currentCall = null;
 let targetSocketId = null;
 let currentConsultation = null;
 let medSessaoAtiva = null;
 let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
-
-let candidatosPendentes = [];
 let remoteStream = null;
 
-// Configuração WebRTC dinâmica
-let rtcConfig = {
+// Configuração de ICE servers (STUN + TURN público de fallback).
+// Sem dependência de credenciais pagas (Twilio removido para simplificar).
+const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelay', credential: 'openrelay' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelay', credential: 'openrelay' }
   ]
 };
 
-// Busca os servidores TURN oficiais da Twilio via backend antes de ligar
-async function carregarServidoresTurnTwilio() {
-  try {
-    const res = await fetch('/api/get-turn-credentials');
-    const data = await res.json();
-    if (data.iceServers && data.iceServers.length > 0) {
-      rtcConfig.iceServers = data.iceServers;
-      console.log('✅ Servidores TURN da Twilio carregados com sucesso!');
-    }
-  } catch (err) {
-    console.warn('⚠️ Falha ao carregar Twilio TURN, usando fallback público.', err);
-  }
+// Cria (uma única vez) a conexão de sinalização de vídeo via PeerJS,
+// usando o próprio servidor (rota /peerjs montada em server.js).
+function iniciarPeer() {
+  if (peer && !peer.destroyed) return peer;
+
+  peer = new Peer(socket.id, {
+    host: location.hostname,
+    port: location.port || (location.protocol === 'https:' ? 443 : 80),
+    path: '/peerjs',
+    secure: location.protocol === 'https:',
+    config: rtcConfig
+  });
+
+  peer.on('open', (id) => {
+    console.log('✅ Sinalização de vídeo pronta. ID:', id);
+  });
+
+  // Chamada recebida (lado que não iniciou a chamada)
+  peer.on('call', async (call) => {
+    await obterMidiaLocal();
+    call.answer(localStream);
+    wireCall(call);
+  });
+
+  peer.on('error', (err) => {
+    console.warn('⚠️ Erro na sinalização de vídeo:', err);
+  });
+
+  peer.on('disconnected', () => {
+    if (peer && !peer.destroyed) peer.reconnect();
+  });
+
+  return peer;
 }
-carregarServidoresTurnTwilio();
+
+// Liga os eventos de uma chamada (recebida ou originada) ao vídeo remoto
+function wireCall(call) {
+  currentCall = call;
+  targetSocketId = call.peer;
+
+  call.on('stream', (stream) => {
+    remoteStream = stream;
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo) {
+      remoteVideo.srcObject = stream;
+      tocarVideoRemoto(remoteVideo);
+    }
+  });
+
+  call.on('close', () => {
+    currentCall = null;
+  });
+
+  call.on('error', (err) => console.warn('⚠️ Erro na chamada:', err));
+}
+
+// Garante que a sinalização já esteja pronta assim que o socket conectar,
+// para que o médico consiga chamar o paciente a qualquer momento.
+socket.on('connect', () => {
+  iniciarPeer();
+});
+if (socket.connected) iniciarPeer();
 
 // MÁSCARAS DE ENTRADA
 function aplicarMascaraCPF(e) {
@@ -130,88 +179,6 @@ function tocarVideoRemoto(video) {
     p.catch(err => console.log('Erro play remoto:', err));
   }
 }
-
-async function aplicarCandidatosPendentes() {
-  if (!peerConnection || !peerConnection.remoteDescription) return;
-  while (candidatosPendentes.length > 0) {
-    const candidate = candidatosPendentes.shift();
-    try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    } catch (e) {
-      console.warn('Erro ao aplicar ICE:', e);
-    }
-  }
-}
-
-function criarPeerConnection(outroSocketId) {
-  if (peerConnection) peerConnection.close();
-  peerConnection = new RTCPeerConnection(rtcConfig);
-
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-  }
-
-  remoteStream = new MediaStream();
-  const remoteVideo = document.getElementById('remote-video');
-  if (remoteVideo) {
-    remoteVideo.srcObject = remoteStream;
-  }
-
-  peerConnection.ontrack = (event) => {
-    if (event.streams && event.streams[0]) {
-      event.streams[0].getTracks().forEach(track => {
-        if (!remoteStream.getTracks().includes(track)) {
-          remoteStream.addTrack(track);
-        }
-      });
-    } else if (event.track) {
-      remoteStream.addTrack(event.track);
-    }
-    if (remoteVideo) tocarVideoRemoto(remoteVideo);
-  };
-
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      socket.emit('webrtc-ice-candidate', { target: outroSocketId, candidate: event.candidate });
-    }
-  };
-}
-
-socket.on('webrtc-offer', async (data) => {
-  targetSocketId = data.sender;
-  candidatosPendentes = [];
-
-  await obterMidiaLocal();
-  criarPeerConnection(targetSocketId);
-
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-  await aplicarCandidatosPendentes();
-
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-
-  socket.emit('webrtc-answer', { target: targetSocketId, sdp: answer });
-});
-
-socket.on('webrtc-answer', async (data) => {
-  if (peerConnection) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    await aplicarCandidatosPendentes();
-  }
-});
-
-socket.on('webrtc-ice-candidate', async (data) => {
-  if (!data.candidate) return;
-  if (peerConnection && peerConnection.remoteDescription) {
-    try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    } catch (e) {}
-  } else {
-    candidatosPendentes.push(data.candidate);
-  }
-});
 
 // LISTA DE MÉDICOS
 socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
@@ -394,19 +361,16 @@ socket.on('atualizar-fila', (fila) => {
 
 window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   targetSocketId = pacienteSocketId;
-  candidatosPendentes = [];
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
-  
+
   socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
-  
+
   await obterMidiaLocal();
-  criarPeerConnection(targetSocketId);
-  
-  const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-  await peerConnection.setLocalDescription(offer);
-  
-  socket.emit('webrtc-offer', { target: targetSocketId, sdp: offer });
+  iniciarPeer();
+
+  const call = peer.call(pacienteSocketId, localStream);
+  wireCall(call);
 };
 
 socket.on('chamado-para-consulta', async (dados) => {
@@ -421,6 +385,7 @@ socket.on('chamado-para-consulta', async (dados) => {
   
   configurarInterfaceConsulta(false);
   await obterMidiaLocal();
+  iniciarPeer(); // garante que já esteja pronto pra receber a chamada do médico
 });
 
 function configurarInterfaceConsulta(isDoctor) {
@@ -450,13 +415,12 @@ socket.on('consulta-encerrada', () => {
 });
 
 function limparEVoltarLobby() {
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
+  if (currentCall) {
+    currentCall.close();
+    currentCall = null;
   }
-  candidatosPendentes = [];
   remoteStream = null;
-  
+
   const remotoVid = document.getElementById('remote-video');
   if (remotoVid) remotoVid.srcObject = null;
   
