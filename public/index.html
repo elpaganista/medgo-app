@@ -69,7 +69,6 @@
     <section id="tab-paciente" class="tab-content block space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Sidebar Corpo Médico -->
         <div class="bg-brand-panel border border-slate-800 p-6 rounded-2xl">
           <h3 class="text-md font-semibold text-cyan-400 mb-4 flex items-center gap-2">
             <i class="fa-solid fa-stethoscope"></i> Corpo Médico Online
@@ -79,10 +78,9 @@
           </div>
         </div>
 
-        <!-- Formulário do Paciente -->
         <div class="lg:col-span-2 bg-brand-panel border border-slate-800 p-6 rounded-2xl" id="form-paciente-box">
-          <h2 class="text-xl font-bold text-white mb-1">Entrar no Atendimento</h2>
-          <p class="text-xs text-slate-400 mb-6">Preencha seus dados para entrar na fila de espera virtual</p>
+          <h2 class="text-xl font-bold text-white mb-1">Atendimento MedGo</h2>
+          <p class="text-xs text-slate-400 mb-6">Preencha seus dados para entrar na fila de consulta</p>
 
           <form id="form-paciente" class="space-y-4">
             <div>
@@ -113,7 +111,6 @@
           </form>
         </div>
 
-        <!-- Lobby da Sala de Espera -->
         <div id="lobby-paciente" class="hidden lg:col-span-2 bg-brand-panel border border-slate-800 p-8 rounded-2xl text-center space-y-4">
           <div class="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center text-3xl mx-auto animate-pulse">
             <i class="fa-solid fa-clock"></i>
@@ -128,11 +125,10 @@
     <!-- 2. ABA MÉDICO -->
     <section id="tab-medico" class="tab-content hidden space-y-6">
       
-      <!-- Box de Autenticação -->
       <div id="box-medico-auth" class="max-w-md mx-auto bg-brand-panel border border-slate-800 p-6 rounded-2xl space-y-6">
         <div class="flex border-b border-slate-800 pb-3 gap-4">
-          <button id="btn-med-login-view" class="flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400">Login</button>
-          <button id="btn-med-cad-view" class="flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-white">Novo Cadastro</button>
+          <button type="button" id="btn-med-login-view" class="flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400">Login</button>
+          <button type="button" id="btn-med-cad-view" class="flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-white">Novo Cadastro</button>
         </div>
 
         <form id="form-login-medico" class="space-y-4">
@@ -152,25 +148,25 @@
         <form id="form-cadastro-medico" class="hidden space-y-4">
           <div>
             <label class="block text-xs text-slate-300 mb-1">Nome Completo</label>
-            <input type="text" id="med-cad-nome" placeholder="Dr. Nome Sobrenome" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+            <input type="text" id="med-cad-nome" placeholder="Dr. Nome Sobrenome" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs text-slate-300 mb-1">CPF</label>
-              <input type="text" id="med-cad-cpf" placeholder="000.000.000-00" maxlength="14" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+              <input type="text" id="med-cad-cpf" placeholder="000.000.000-00" maxlength="14" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
             </div>
             <div>
               <label class="block text-xs text-slate-300 mb-1">CRM / UF</label>
-              <input type="text" id="med-cad-crm" placeholder="123456/CE" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+              <input type="text" id="med-cad-crm" placeholder="123456/CE" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
             </div>
           </div>
           <div>
             <label class="block text-xs text-slate-300 mb-1">E-mail</label>
-            <input type="email" id="med-cad-email" placeholder="medico@medgo.com" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+            <input type="email" id="med-cad-email" placeholder="medico@medgo.com" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
           </div>
           <div>
             <label class="block text-xs text-slate-300 mb-1">Senha</label>
-            <input type="password" id="med-cad-senha" placeholder="Crie uma senha" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+            <input type="password" id="med-cad-senha" placeholder="Crie uma senha" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
           </div>
           <button type="submit" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-sm transition border border-slate-700">
             Enviar Cadastro para Aprovação
@@ -178,7 +174,6 @@
         </form>
       </div>
 
-      <!-- Dashboard do Médico -->
       <div id="dashboard-medico" class="hidden space-y-6">
         <div class="flex items-center justify-between bg-brand-panel p-6 border border-slate-800 rounded-2xl">
           <div>
@@ -201,17 +196,16 @@
     <!-- 3. ABA ADMINISTRADOR -->
     <section id="tab-admin" class="tab-content hidden space-y-6">
       
-      <!-- Login Admin -->
       <div id="login-admin-box" class="max-w-md mx-auto bg-brand-panel border border-slate-800 p-6 rounded-2xl space-y-4">
         <h2 class="text-lg font-bold text-white">Painel Gestor MedGo</h2>
         <form id="form-login-admin" class="space-y-4">
           <div>
             <label class="block text-xs text-slate-300 mb-1">Usuário</label>
-            <input type="text" id="adm-user" placeholder="Admin" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+            <input type="text" id="adm-user" placeholder="Admin" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
           </div>
           <div>
             <label class="block text-xs text-slate-300 mb-1">Senha</label>
-            <input type="password" id="adm-pass" placeholder="••••••••" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white">
+            <input type="password" id="adm-pass" placeholder="••••••••" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
           </div>
           <button type="submit" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl text-sm transition">
             Entrar no Sistema
@@ -219,7 +213,6 @@
         </form>
       </div>
 
-      <!-- Dashboard Gestor Admin -->
       <div id="dashboard-admin" class="hidden space-y-6">
         <div class="flex items-center justify-between bg-brand-panel p-6 border border-slate-800 rounded-2xl">
           <h2 class="text-xl font-bold text-white">Gestão Geral MedGo</h2>
@@ -249,7 +242,9 @@
 
         <div class="bg-brand-panel p-6 border border-slate-800 rounded-2xl space-y-4">
           <h3 class="text-md font-semibold text-white">Aprovação & Gestão de Médicos</h3>
-          <div id="lista-medicos-admin" class="space-y-3"></div>
+          <div id="lista-medicos-admin" class="space-y-3">
+            <p class="text-xs text-slate-400">Carregando médicos...</p>
+          </div>
         </div>
 
         <div class="bg-brand-panel p-6 border border-slate-800 rounded-2xl space-y-4">
@@ -260,31 +255,22 @@
 
     </section>
 
-    <!-- 4. SALA DE CONSULTA EM VÍDEO (SPLIT SIDE-BY-SIDE) -->
+    <!-- 4. SALA DE CONSULTA EM VÍDEO -->
     <section id="sala-consulta" class="hidden space-y-4">
-      
       <div id="info-medico-paciente-banner" class="bg-cyan-950/60 border border-cyan-800/50 p-3 rounded-xl flex items-center gap-3 text-xs text-cyan-300">
         <i class="fa-solid fa-circle-user text-base"></i>
         <span id="nome-medico-atendendo">Em consulta médica</span>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[580px]">
-        
-        <!-- Esquerda: Vídeo Split -->
         <div class="lg:col-span-7 flex flex-col space-y-4">
           <div class="relative flex-1 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden min-h-[380px] flex items-center justify-center">
-            
-            <!-- Video Remoto -->
             <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
-
-            <!-- Video Local (PIP) -->
             <div class="absolute bottom-4 right-4 w-36 h-48 bg-slate-900 border-2 border-cyan-500/50 rounded-xl overflow-hidden shadow-2xl z-20">
               <video id="local-video" autoplay muted playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
             </div>
-
           </div>
 
-          <!-- Controles de Mídia -->
           <div class="bg-brand-panel border border-slate-800 p-3 rounded-2xl flex items-center justify-center gap-4">
             <button id="btn-toggle-mic" class="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg border border-slate-700 hover:bg-slate-700">🎤</button>
             <button id="btn-toggle-cam" class="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg border border-slate-700 hover:bg-slate-700">📷</button>
@@ -292,9 +278,7 @@
           </div>
         </div>
 
-        <!-- Direita: Prontuário / Documentos -->
         <div class="lg:col-span-5 bg-brand-panel border border-slate-800 rounded-2xl p-5 flex flex-col space-y-4">
-          
           <div id="anamnese-box" class="flex-1 flex flex-col space-y-2">
             <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Ficha Clínico-Anamnese</h3>
             <textarea id="texto-anamnese" placeholder="Sintomas, hipótese diagnóstica e conduta médica..." class="flex-1 w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 resize-none min-h-[160px]"></textarea>
@@ -302,7 +286,6 @@
 
           <div id="chat-arquivos-box" class="border-t border-slate-800 pt-4 space-y-3">
             <h3 id="titulo-documentos" class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Documentos da Consulta</h3>
-            
             <div id="lista-arquivos" class="space-y-2 max-h-[120px] overflow-y-auto">
               <p class="empty-files text-xs text-slate-500">Nenhum documento anexado ainda.</p>
             </div>
@@ -314,11 +297,8 @@
               </button>
             </div>
           </div>
-
         </div>
-
       </div>
-
     </section>
 
   </main>

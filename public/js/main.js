@@ -92,40 +92,29 @@ async function obterMidiaLocal() {
   return localStream;
 }
 
-// Fila e Ações
-socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
-  const containerPaciente = document.getElementById('lista-medicos-status-paciente');
-  if (containerPaciente) {
-    const aprovados = listaMedicos.filter(m => m.statusCadastro === 'aprovado');
-    containerPaciente.innerHTML = aprovados.length === 0 
-      ? '<p class="text-xs text-slate-400">Nenhum médico aprovado no momento.</p>'
-      : aprovados.map(m => `
-        <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-          <div>
-            <strong class="text-slate-200">Dr(a). ${m.nome}</strong><br>
-            <span class="text-slate-400">CRM: ${m.crm}</span>
-          </div>
-          <span class="w-2.5 h-2.5 rounded-full ${m.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span>
-        </div>
-      `).join('');
-  }
-
-  renderMedicosAdmin(listaMedicos);
-});
-
-socket.on('atualizar-admin-dashboard', (data) => {
-  if (!data) return;
-  document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje || 0;
-  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
-  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
-  document.getElementById('count-admin-fila').innerText = data.filaAtualCount || 0;
-  
-  if (data.medicos) renderMedicosAdmin(data.medicos);
-  if (data.logsConsultas) renderLogsAdmin(data.logsConsultas);
-});
-
-// Formulários Médico e Paciente
+// TOGGLE ENTRE LOGIN E CADASTRO DO MÉDICO
+const btnMedLoginView = document.getElementById('btn-med-login-view');
+const btnMedCadView = document.getElementById('btn-med-cad-view');
+const formLoginMedico = document.getElementById('form-login-medico');
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
+
+if (btnMedLoginView && btnMedCadView) {
+  btnMedLoginView.addEventListener('click', () => {
+    btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400";
+    btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-white";
+    formLoginMedico.classList.remove('hidden');
+    formCadastroMedico.classList.add('hidden');
+  });
+
+  btnMedCadView.addEventListener('click', () => {
+    btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400";
+    btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-white";
+    formCadastroMedico.classList.remove('hidden');
+    formLoginMedico.classList.add('hidden');
+  });
+}
+
+// CADASTRO E LOGIN DE MÉDICOS
 if (formCadastroMedico) {
   formCadastroMedico.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -148,7 +137,6 @@ if (formCadastroMedico) {
   });
 }
 
-const formLoginMedico = document.getElementById('form-login-medico');
 if (formLoginMedico) {
   formLoginMedico.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -174,6 +162,38 @@ if (formLoginMedico) {
   });
 }
 
+const btnLogoutMed = document.getElementById('btn-logout-medico');
+if (btnLogoutMed) {
+  btnLogoutMed.addEventListener('click', () => {
+    socket.emit('medico-offline');
+    medSessaoAtiva = null;
+    document.getElementById('dashboard-medico').classList.add('hidden');
+    document.getElementById('box-medico-auth').classList.remove('hidden');
+  });
+}
+
+// ATUALIZAÇÃO DA LISTA DE MÉDICOS
+socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
+  const containerPaciente = document.getElementById('lista-medicos-status-paciente');
+  if (containerPaciente) {
+    const aprovados = listaMedicos.filter(m => m.statusCadastro === 'aprovado');
+    containerPaciente.innerHTML = aprovados.length === 0 
+      ? '<p class="text-xs text-slate-400">Nenhum médico aprovado no momento.</p>'
+      : aprovados.map(m => `
+        <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+          <div>
+            <strong class="text-slate-200">Dr(a). ${m.nome}</strong><br>
+            <span class="text-slate-400">CRM: ${m.crm}</span>
+          </div>
+          <span class="w-2.5 h-2.5 rounded-full ${m.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}"></span>
+        </div>
+      `).join('');
+  }
+
+  renderMedicosAdmin(listaMedicos);
+});
+
+// FORMULÁRIO DO PACIENTE E FILA
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -260,7 +280,7 @@ if (btnEncerrar) {
   });
 }
 
-// Gestão de Admin
+// ADMIN DASHBOARD
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
   formAdmin.addEventListener('submit', (e) => {
@@ -268,55 +288,102 @@ if (formAdmin) {
     if (document.getElementById('adm-user').value === 'Admin' && document.getElementById('adm-pass').value === 'Tr0sH!') {
       document.getElementById('login-admin-box').classList.add('hidden');
       document.getElementById('dashboard-admin').classList.remove('hidden');
-      fetch('/api/admin/dados').then(r => r.json()).then(renderAdminDashboard);
+      carregarDadosAdmin();
     } else {
       alert('Credenciais incorretas!');
     }
   });
 }
 
+async function carregarDadosAdmin() {
+  const res = await fetch('/api/admin/dados');
+  const data = await res.json();
+  renderAdminDashboard(data);
+}
+
+function renderAdminDashboard(data) {
+  if (!data) return;
+  document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje || 0;
+  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
+  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
+  document.getElementById('count-admin-fila').innerText = data.filaAtualCount || 0;
+  
+  if (data.medicos) renderMedicosAdmin(data.medicos);
+  if (data.logsConsultas) renderLogsAdmin(data.logsConsultas);
+}
+
+socket.on('atualizar-admin-dashboard', (data) => {
+  renderAdminDashboard(data);
+});
+
 function renderMedicosAdmin(medicos) {
   const container = document.getElementById('lista-medicos-admin');
   if (!container) return;
-  container.innerHTML = (!medicos || medicos.length === 0) 
-    ? '<p class="text-xs text-slate-500">Nenhum médico cadastrado.</p>'
-    : medicos.map(m => `
-      <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-        <div><strong class="text-white">${m.nome}</strong> (CRM: ${m.crm}) - Status: <em class="text-cyan-400">${m.statusCadastro.toUpperCase()}</em></div>
-        <div class="flex gap-2">
-          ${m.statusCadastro === 'pendente' ? `<button class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Aprovar</button>` : ''}
-          ${m.statusCadastro === 'aprovado' ? `<button class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Bloquear</button>` : ''}
-          <button class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg" onclick="excluirMedicoAdmin('${m.id}')">Excluir</button>
-        </div>
+
+  if (!medicos || medicos.length === 0) {
+    container.innerHTML = '<p class="text-xs text-slate-500">Nenhum médico cadastrado.</p>';
+    return;
+  }
+
+  container.innerHTML = medicos.map(m => `
+    <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+      <div>
+        <strong class="text-white">${m.nome}</strong> <span class="text-slate-400">(CRM: ${m.crm})</span> - Status: <em class="text-cyan-400 font-bold">${m.statusCadastro.toUpperCase()}</em>
       </div>
-    `).join('');
+      <div class="flex gap-2">
+        ${m.statusCadastro === 'pendente' ? `
+          <button class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Aprovar</button>
+          <button class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Negar</button>
+        ` : ''}
+        ${m.statusCadastro === 'aprovado' ? `
+          <button class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Bloquear</button>
+        ` : ''}
+        ${m.statusCadastro === 'bloqueado' ? `
+          <button class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Desbloquear</button>
+        ` : ''}
+        <button class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg transition" onclick="excluirMedicoAdmin('${m.id}')">Excluir</button>
+      </div>
+    </div>
+  `).join('');
 }
 
 function renderLogsAdmin(logs) {
   const lista = document.getElementById('lista-logs-consultas');
   if (!lista) return;
-  lista.innerHTML = (!logs || logs.length === 0)
-    ? '<p class="text-xs text-slate-500">Nenhum log gravado.</p>'
-    : logs.map(l => `
-      <li class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-        <span><strong class="text-white">${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
-        <a href="${l.zipUrl}" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg">📦 Baixar .ZIP</a>
-      </li>
-    `).join('');
+
+  if (!logs || logs.length === 0) {
+    lista.innerHTML = '<p class="text-xs text-slate-500">Nenhum log gravado.</p>';
+    return;
+  }
+
+  lista.innerHTML = logs.map(l => `
+    <li class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+      <span><strong class="text-white">${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
+      <a href="${l.zipUrl}" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg">📦 Baixar .ZIP</a>
+    </li>
+  `).join('');
 }
 
 window.alterarStatusMedico = async (medicoId, novoStatus) => {
-  await fetch('/api/admin/medico/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ medicoId, novoStatus }) });
-  fetch('/api/admin/dados').then(r => r.json()).then(renderAdminDashboard);
+  await fetch('/api/admin/medico/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ medicoId, novoStatus })
+  });
+  carregarDadosAdmin();
 };
 
 window.excluirMedicoAdmin = async (medicoId) => {
-  if (!confirm('Deseja excluir este médico?')) return;
-  await fetch('/api/admin/medico/excluir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ medicoId }) });
-  fetch('/api/admin/dados').then(r => r.json()).then(renderAdminDashboard);
+  if (!confirm('Deseja realmente excluir este médico do sistema?')) return;
+  await fetch('/api/admin/medico/excluir', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ medicoId })
+  });
+  carregarDadosAdmin();
 };
 
-// Upload de Documentos
+// UPLOAD DE DOCUMENTOS
 const inputArquivo = document.getElementById('input-arquivo');
 if (inputArquivo) {
   inputArquivo.addEventListener('change', async (e) => {
@@ -346,6 +413,7 @@ socket.on('receber-arquivo-medico', (fileData) => {
 function adicionarArquivoNaLista(file) {
   const container = document.getElementById('lista-arquivos');
   if (!container) return;
+
   const emptyMsg = container.querySelector('.empty-files');
   if (emptyMsg) emptyMsg.remove();
 
