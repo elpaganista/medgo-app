@@ -7,9 +7,15 @@ const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const archiver = require('archiver');
 
+process.env.TZ = 'America/Fortaleza';
+
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: { origin: "*" },
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -25,7 +31,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Persistência em Banco JSON
 const FILE_MEDICOS = path.join(__dirname, 'data', 'medicos.json');
 const FILE_STATS = path.join(__dirname, 'data', 'estatisticas.json');
 
@@ -38,28 +43,20 @@ function carregarMedicos() {
 }
 
 function salvarMedicos(lista) {
-  fs.writeFileSync(FILE_MEDICOS, JSON.stringify(lista, null, 2));
+  try { fs.writeFileSync(FILE_MEDICOS, JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
 }
 
 function carregarStats() {
-  const padrao = {
-    totalGeralAcessos: 0,
-    historicoDiario: {},  // ex: { "19/09/2026": 5 }
-    historicoMensal: {}   // ex: { "09/2026": 45 }
-  };
+  const padrao = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
   if (!fs.existsSync(FILE_STATS)) {
     fs.writeFileSync(FILE_STATS, JSON.stringify(padrao, null, 2));
     return padrao;
   }
-  try {
-    return { ...padrao, ...JSON.parse(fs.readFileSync(FILE_STATS, 'utf8')) };
-  } catch (err) {
-    return padrao;
-  }
+  try { return { ...padrao, ...JSON.parse(fs.readFileSync(FILE_STATS, 'utf8')) }; } catch (err) { return padrao; }
 }
 
 function salvarStats(stats) {
-  fs.writeFileSync(FILE_STATS, JSON.stringify(stats, null, 2));
+  try { fs.writeFileSync(FILE_STATS, JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
 }
 
 let medicos = carregarMedicos();
@@ -69,15 +66,21 @@ let registroPacientesGeral = [];
 let consultasAtivas = new Map();
 let logsConsultas = [];
 
-function registrarAcessoEAtendimento() {
+function obterDataHoraBR() {
   const agora = new Date();
-  const dataHoje = agora.toLocaleDateString('pt-BR');
-  const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
+  return {
+    data: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }),
+    hora: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza' }),
+    dataHoraCompleta: agora.toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }),
+    mesAno: `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`
+  };
+}
 
+function registrarAcessoEAtendimento() {
+  const dh = obterDataHoraBR();
   statsGeral.totalGeralAcessos = (statsGeral.totalGeralAcessos || 0) + 1;
-  statsGeral.historicoDiario[dataHoje] = (statsGeral.historicoDiario[dataHoje] || 0) + 1;
-  statsGeral.historicoMensal[mesAno] = (statsGeral.historicoMensal[mesAno] || 0) + 1;
-
+  statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
+  statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
   salvarStats(statsGeral);
 }
 
@@ -97,10 +100,6 @@ app.post('/api/medico/cadastro', (req, res) => {
   if (medicos.find(m => m.cpf === cpf)) {
     return res.status(400).json({ error: 'Este CPF já está cadastrado no sistema.' });
   }
-  if (medicos.find(m => m.email.toLowerCase() === email.toLowerCase())) {
-    return res.status(400).json({ error: 'Este E-mail já está cadastrado por outro médico.' });
-  }
-
   const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
   medicos.push(novoMedico);
   salvarMedicos(medicos);
@@ -121,37 +120,16 @@ app.post('/api/medico/login', (req, res) => {
   res.json({ success: true, medico: { nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
 
-// Recuperação de Senha
-app.post('/api/medico/recuperar-senha', (req, res) => {
-  const { email, novaSenha } = req.body;
-  const medico = medicos.find(m => m.email.toLowerCase() === email.toLowerCase());
-
-  if (!medico) return res.status(404).json({ error: 'Conta não encontrada.' });
-
-  if (novaSenha) {
-    medico.senha = novaSenha;
-    salvarMedicos(medicos);
-    return res.json({ success: true, message: 'Senha redefinida com sucesso!' });
-  }
-
-  res.json({ success: true, message: 'Conta localizada! Digite sua nova senha.' });
-});
-
-// Endpoints Admin & Estatísticas
+// Admin Endpoints
 app.get('/api/admin/dados', (req, res) => {
-  const agora = new Date();
-  const dataHoje = agora.toLocaleDateString('pt-BR');
-  const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
-
+  const dh = obterDataHoraBR();
   res.json({
     medicos,
     logsConsultas,
     registroPacientesGeral,
-    atendimentosHoje: statsGeral.historicoDiario[dataHoje] || 0,
-    atendimentosMes: statsGeral.historicoMensal[mesAno] || 0,
+    atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+    atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
     totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
-    historicoDiario: statsGeral.historicoDiario,
-    historicoMensal: statsGeral.historicoMensal,
     filaAtualCount: filaPacientes.length
   });
 });
@@ -169,90 +147,92 @@ app.post('/api/admin/medico/status', (req, res) => {
   }
 });
 
-// Exclusão de Registros do Banco pelo Admin
 app.post('/api/admin/limpar-historico', (req, res) => {
   const { tipo } = req.body;
-  if (tipo === 'pacientes') {
-    registroPacientesGeral = [];
-  } else if (tipo === 'stats') {
+  if (tipo === 'pacientes') registroPacientesGeral = [];
+  else if (tipo === 'stats') {
     statsGeral = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
     salvarStats(statsGeral);
-  } else if (tipo === 'logs') {
-    logsConsultas = [];
-  }
-  res.json({ success: true, message: 'Registros atualizados pelo Administrador.' });
+  } else if (tipo === 'logs') logsConsultas = [];
+  res.json({ success: true });
 });
 
 app.get('/api/admin/download-log/:sessionId', (req, res) => {
-  const { sessionId } = req.params;
-  const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
+  const zipPath = path.join(__dirname, 'logs', `consulta-${req.params.sessionId}.zip`);
   if (fs.existsSync(zipPath)) return res.download(zipPath);
-  res.status(404).send('Arquivo ZIP não encontrado.');
+  res.status(404).send('Arquivo não encontrado.');
 });
 
 function processarFinalizacaoConsulta(dados) {
-  registrarAcessoEAtendimento();
+  try {
+    registrarAcessoEAtendimento();
+    const dh = obterDataHoraBR();
+    const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
-  const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
-  const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
-  const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
+    const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
+    const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
 
-  const doc = new PDFDocument();
-  const stream = fs.createWriteStream(pdfPath);
-  doc.pipe(stream);
+    const doc = new PDFDocument();
+    const stream = fs.createWriteStream(pdfPath);
+    doc.pipe(stream);
 
-  doc.fontSize(20).text('MedGo - Relatório de Telemedicina', { align: 'center' });
-  doc.moveDown();
-  doc.fontSize(12).text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`);
-  doc.text(`Médico: ${medico.nome || 'Dr. MedGo'} (CRM: ${medico.crm || 'N/A'})`);
-  doc.text(`Paciente: ${paciente.nome || 'Paciente'} | CPF: ${paciente.cpf || 'N/A'}`);
-  doc.moveDown();
-  doc.fontSize(14).text('Ficha Clínico-Anamnese:');
-  doc.fontSize(11).text(anamnese || 'Consulta encerrada devido a desconexão ou término.');
-  doc.end();
+    doc.fontSize(20).text('MedGo - Relatório de Telemedicina', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
+    doc.text(`Médico: ${medico?.nome || 'Dr. MedGo'} (CRM: ${medico?.crm || 'N/A'})`);
+    doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/A'}`);
+    doc.moveDown();
+    doc.fontSize(14).text('Ficha Clínico-Anamnese:');
+    doc.fontSize(11).text(anamnese || 'Consulta encerrada.');
+    doc.end();
 
-  stream.on('finish', () => {
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    stream.on('finish', () => {
+      try {
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
-    archive.pipe(output);
-    archive.file(pdfPath, { name: `Anamnese_${paciente.nome || 'Paciente'}.pdf` });
+        archive.pipe(output);
+        if (fs.existsSync(pdfPath)) {
+          archive.file(pdfPath, { name: `Anamnese_${paciente?.nome || 'Paciente'}.pdf` });
+        }
 
-    (arquivosTrocados || []).forEach(file => {
-      const filePath = path.join(__dirname, 'uploads', file.filename);
-      if (fs.existsSync(filePath)) {
-        archive.file(filePath, { name: `Anexos/${file.originalname}` });
+        (arquivosTrocados || []).forEach(file => {
+          const filePath = path.join(__dirname, 'uploads', file.filename);
+          if (fs.existsSync(filePath)) {
+            archive.file(filePath, { name: `Anexos/${file.originalname}` });
+          }
+        });
+
+        archive.finalize();
+
+        output.on('close', () => {
+          logsConsultas.push({
+            sessionId,
+            paciente: paciente?.nome || 'Paciente',
+            medico: medico?.nome || 'Dr. MedGo',
+            data: dh.dataHoraCompleta,
+            zipUrl: `/api/admin/download-log/${sessionId}`
+          });
+
+          const pGeral = registroPacientesGeral.find(p => p.cpf === paciente?.cpf);
+          if (pGeral) pGeral.status = 'Atendido';
+
+          io.emit('atualizar-admin-dashboard', {
+            logsConsultas,
+            atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+            atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
+            totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
+            registroPacientesGeral,
+            filaAtualCount: filaPacientes.length
+          });
+        });
+      } catch (e) {
+        console.error("Erro ao gerar ZIP:", e);
       }
     });
-
-    archive.finalize();
-
-    output.on('close', () => {
-      logsConsultas.push({
-        sessionId,
-        paciente: paciente.nome || 'Paciente',
-        medico: medico.nome || 'Dr. MedGo',
-        data: new Date().toLocaleString('pt-BR'),
-        zipUrl: `/api/admin/download-log/${sessionId}`
-      });
-
-      const pGeral = registroPacientesGeral.find(p => p.cpf === paciente.cpf);
-      if (pGeral) pGeral.status = 'Atendido';
-
-      const agora = new Date();
-      const dataHoje = agora.toLocaleDateString('pt-BR');
-      const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
-
-      io.emit('atualizar-admin-dashboard', {
-        logsConsultas,
-        atendimentosHoje: statsGeral.historicoDiario[dataHoje] || 0,
-        atendimentosMes: statsGeral.historicoMensal[mesAno] || 0,
-        totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
-        registroPacientesGeral,
-        filaAtualCount: filaPacientes.length
-      });
-    });
-  });
+  } catch (err) {
+    console.error("Erro no processamento da consulta:", err);
+  }
 }
 
 // WebSockets
@@ -260,10 +240,11 @@ io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
 
   socket.on('entrar-fila', (dados) => {
+    const dh = obterDataHoraBR();
     const paciente = { 
       id: socket.id, 
       ...dados, 
-      horaEntrada: new Date().toLocaleTimeString('pt-BR'),
+      horaEntrada: dh.hora,
       status: 'Em Espera'
     };
     filaPacientes.push(paciente);
@@ -288,7 +269,7 @@ io.on('connection', (socket) => {
       sessionId,
       medicoSocketId: socket.id,
       pacienteSocketId,
-      medico: medicoInfo,
+      medico: medicoInfo || { nome: 'Médico MedGo', crm: 'N/A' },
       paciente: paciente || { nome: 'Paciente', cpf: '000.000.000-00' },
       anamnese: '',
       arquivosTrocados: []
@@ -303,7 +284,11 @@ io.on('connection', (socket) => {
       filaAtualCount: filaPacientes.length
     });
     
-    io.to(pacienteSocketId).emit('chamado-para-consulta', { medicoSocketId: socket.id, sessionId });
+    io.to(pacienteSocketId).emit('chamado-para-consulta', { 
+      medicoSocketId: socket.id, 
+      sessionId,
+      medicoInfo: dadosConsulta.medico
+    });
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
@@ -317,15 +302,15 @@ io.on('connection', (socket) => {
     if (consulta) consulta.anamnese = texto;
   });
 
-  socket.on('finalizar-consulta', async (dados) => {
+  socket.on('finalizar-consulta', (dados) => {
     const consulta = consultasAtivas.get(socket.id);
-    const payload = consulta || dados;
-    if (dados.anamnese) payload.anamnese = dados.anamnese;
+    const payload = consulta || { sessionId: Date.now().toString(), medico: {}, paciente: {} };
+    if (dados && dados.anamnese) payload.anamnese = dados.anamnese;
 
     processarFinalizacaoConsulta(payload);
 
-    if (payload.pacienteSocketId) io.to(payload.pacienteSocketId).emit('consulta-encerrada-pelo-medico');
-    if (payload.medicoSocketId) io.to(payload.medicoSocketId).emit('consulta-encerrada-pelo-medico');
+    if (payload.pacienteSocketId) io.to(payload.pacienteSocketId).emit('consulta-encerrada');
+    if (payload.medicoSocketId) io.to(payload.medicoSocketId).emit('consulta-encerrada');
 
     consultasAtivas.delete(payload.medicoSocketId);
     consultasAtivas.delete(payload.pacienteSocketId);
@@ -354,4 +339,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 MedGo rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 MedGo ativo na porta ${PORT}`));

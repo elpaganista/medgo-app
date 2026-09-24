@@ -9,7 +9,7 @@ let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
 
-// MÁSCARAS E MÁXIMOS DE CAMPOS (CPF E TELEFONE)
+// MÁSCARAS
 function aplicarMascaraCPF(e) {
   let v = e.target.value.replace(/\D/g, '');
   if (v.length > 11) v = v.substring(0, 11);
@@ -34,7 +34,7 @@ document.querySelectorAll('#pac-cpf, #med-login-cpf, #med-cad-cpf').forEach(inpu
 const pacTel = document.getElementById('pac-telefone');
 if (pacTel) pacTel.addEventListener('input', aplicarMascaraTelefone);
 
-// Sincronização Local de Sessão Médica
+// Sessão Médica Local
 function obterMedicoSalvoLocal() {
   try { return JSON.parse(localStorage.getItem('medgo_medico_sessao')); } catch(e) { return null; }
 }
@@ -43,15 +43,16 @@ function salvarMedicoLocal(medico) {
   else localStorage.removeItem('medgo_medico_sessao');
 }
 
-// Modo Claro / Escuro
+// Tema Claro / Escuro
 const btnTema = document.getElementById('btn-tema');
-btnTema.addEventListener('click', () => {
-  const atual = document.documentElement.getAttribute('data-theme');
-  const novo = atual === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', novo);
-});
+if (btnTema) {
+  btnTema.addEventListener('click', () => {
+    const atual = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', atual === 'dark' ? 'light' : 'dark');
+  });
+}
 
-// Navegação por Abas
+// Abas Navegação
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -61,147 +62,155 @@ tabButtons.forEach(btn => {
     tabContents.forEach(c => c.classList.add('hidden'));
 
     btn.classList.add('active');
-    const tabId = `tab-${btn.getAttribute('data-tab')}`;
-    document.getElementById(tabId).classList.remove('hidden');
+    const target = document.getElementById(`tab-${btn.getAttribute('data-tab')}`);
+    if (target) target.classList.remove('hidden');
   });
 });
 
-// Botões para Ativar/Desativar Microfone e Câmera
+// Captura de Mídia (Com fallback de vídeo compatível mobile/PC)
+async function obterMidiaLocal() {
+  if (localStream) return localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { min: 320, ideal: 640, max: 1280 },
+        height: { min: 240, ideal: 480, max: 720 },
+        facingMode: "user"
+      },
+      audio: true
+    });
+    const locVid = document.getElementById('local-video');
+    if (locVid) {
+      locVid.srcObject = localStream;
+      locVid.muted = true;
+      locVid.play().catch(e => console.log('Erro play local:', e));
+    }
+    return localStream;
+  } catch (err) {
+    alert('Por favor, permita o acesso à Câmera e ao Microfone no seu navegador.');
+    console.error('Erro mídia:', err);
+    return null;
+  }
+}
+
+// Controles Mic/Cam
 const btnToggleMic = document.getElementById('btn-toggle-mic');
 const btnToggleCam = document.getElementById('btn-toggle-cam');
 
-btnToggleMic.addEventListener('click', () => {
-  if (localStream && localStream.getAudioTracks().length > 0) {
-    micAtivo = !micAtivo;
-    localStream.getAudioTracks()[0].enabled = micAtivo;
-    btnToggleMic.innerText = micAtivo ? '🎤 Microfone On' : '🎙️ Microfone Off';
-    btnToggleMic.classList.toggle('off', !micAtivo);
-  }
-});
+if (btnToggleMic) {
+  btnToggleMic.addEventListener('click', () => {
+    if (localStream && localStream.getAudioTracks().length > 0) {
+      micAtivo = !micAtivo;
+      localStream.getAudioTracks()[0].enabled = micAtivo;
+      btnToggleMic.innerText = micAtivo ? '🎤 Microfone On' : '🎙️ Microfone Off';
+      btnToggleMic.classList.toggle('off', !micAtivo);
+    }
+  });
+}
 
-btnToggleCam.addEventListener('click', () => {
-  if (localStream && localStream.getVideoTracks().length > 0) {
-    camAtiva = !camAtiva;
-    localStream.getVideoTracks()[0].enabled = camAtiva;
-    btnToggleCam.innerText = camAtiva ? '📷 Câmera On' : '📷 Câmera Off';
-    btnToggleCam.classList.toggle('off', !camAtiva);
-  }
+if (btnToggleCam) {
+  btnToggleCam.addEventListener('click', () => {
+    if (localStream && localStream.getVideoTracks().length > 0) {
+      camAtiva = !camAtiva;
+      localStream.getVideoTracks()[0].enabled = camAtiva;
+      btnToggleCam.innerText = camAtiva ? '📷 Câmera On' : '📷 Câmera Off';
+      btnToggleCam.classList.toggle('off', !camAtiva);
+    }
+  });
+}
+
+// Inicialização PeerJS
+function inicializarPeerJS() {
+  if (peer) return;
+
+  peer = new Peer(socket.id, {
+    debug: 1,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peer.on('call', async (call) => {
+    currentCall = call;
+    const stream = await obterMidiaLocal();
+    if (stream) {
+      call.answer(stream);
+      call.on('stream', (remoteStream) => {
+        const remoteVideo = document.getElementById('remote-video');
+        if (remoteVideo) {
+          remoteVideo.srcObject = remoteStream;
+          remoteVideo.play().catch(e => console.log('Erro play remoto:', e));
+        }
+      });
+    }
+  });
+}
+
+socket.on('connect', () => {
+  inicializarPeerJS();
 });
 
 // Formulários Área Médica
-const btnMedLoginView = document.getElementById('btn-med-login-view');
-const btnMedCadView = document.getElementById('btn-med-cad-view');
 const formLoginMedico = document.getElementById('form-login-medico');
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
-const formRecuperarSenha = document.getElementById('form-recuperar-senha');
-const linkEsqueciSenha = document.getElementById('link-esqueci-senha');
-const linkVoltarLogin = document.getElementById('link-voltar-login');
 
-btnMedLoginView.addEventListener('click', () => {
-  btnMedLoginView.classList.add('active');
-  btnMedCadView.classList.remove('active');
-  formLoginMedico.classList.remove('hidden');
-  formCadastroMedico.classList.add('hidden');
-  formRecuperarSenha.classList.add('hidden');
-});
+if (formCadastroMedico) {
+  formCadastroMedico.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const dados = {
+      nome: document.getElementById('med-cad-nome').value,
+      cpf: document.getElementById('med-cad-cpf').value,
+      email: document.getElementById('med-cad-email').value,
+      crm: document.getElementById('med-cad-crm').value,
+      senha: document.getElementById('med-cad-senha').value,
+    };
 
-btnMedCadView.addEventListener('click', () => {
-  btnMedCadView.classList.add('active');
-  btnMedLoginView.classList.remove('active');
-  formCadastroMedico.classList.remove('hidden');
-  formLoginMedico.classList.add('hidden');
-  formRecuperarSenha.classList.add('hidden');
-});
-
-linkEsqueciSenha.addEventListener('click', (e) => {
-  e.preventDefault();
-  formLoginMedico.classList.add('hidden');
-  formCadastroMedico.classList.add('hidden');
-  formRecuperarSenha.classList.remove('hidden');
-});
-
-linkVoltarLogin.addEventListener('click', (e) => {
-  e.preventDefault();
-  formRecuperarSenha.classList.add('hidden');
-  formLoginMedico.classList.remove('hidden');
-});
-
-// Cadastro Médico
-formCadastroMedico.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const dados = {
-    nome: document.getElementById('med-cad-nome').value,
-    cpf: document.getElementById('med-cad-cpf').value,
-    email: document.getElementById('med-cad-email').value,
-    crm: document.getElementById('med-cad-crm').value,
-    senha: document.getElementById('med-cad-senha').value,
-  };
-
-  const res = await fetch('/api/medico/cadastro', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados)
+    const res = await fetch('/api/medico/cadastro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados)
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+    if (res.ok) formCadastroMedico.reset();
   });
-  const data = await res.json();
+}
 
-  if (res.ok) {
-    alert(data.message);
-    formCadastroMedico.reset();
-    btnMedLoginView.click();
-  } else {
-    alert(data.error);
-  }
-});
+if (formLoginMedico) {
+  formLoginMedico.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cpf = document.getElementById('med-login-cpf').value;
+    const senha = document.getElementById('med-login-senha').value;
 
-// Redefinir Senha
-formRecuperarSenha.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('rec-email').value;
-  const novaSenha = document.getElementById('rec-nova-senha').value;
+    const res = await fetch('/api/medico/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cpf, senha })
+    });
+    const data = await res.json();
 
-  const res = await fetch('/api/medico/recuperar-senha', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, novaSenha })
+    if (res.ok) {
+      medSessaoAtiva = data.medico;
+      salvarMedicoLocal(medSessaoAtiva);
+      ativarPainelMedico(medSessaoAtiva);
+    } else {
+      alert(data.error);
+    }
   });
-  const data = await res.json();
-
-  if (res.ok) {
-    alert(data.message);
-    formRecuperarSenha.reset();
-    linkVoltarLogin.click();
-  } else {
-    alert(data.error);
-  }
-});
-
-// Login Médico
-formLoginMedico.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const cpf = document.getElementById('med-login-cpf').value;
-  const senha = document.getElementById('med-login-senha').value;
-
-  const res = await fetch('/api/medico/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cpf, senha })
-  });
-  const data = await res.json();
-
-  if (res.ok) {
-    medSessaoAtiva = data.medico;
-    salvarMedicoLocal(medSessaoAtiva);
-    ativarPainelMedico(medSessaoAtiva);
-  } else {
-    alert(data.error);
-  }
-});
+}
 
 function ativarPainelMedico(medico) {
-  document.getElementById('saudacao-medico').innerText = `Dr(a). ${medico.nome}`;
+  const sauda = document.getElementById('saudacao-medico');
+  if (sauda) sauda.innerText = `Dr(a). ${medico.nome}`;
+  
   document.getElementById('box-medico-auth').classList.add('hidden');
   document.getElementById('dashboard-medico').classList.remove('hidden');
-
   document.getElementById('nav-btn-paciente').classList.add('hidden');
   document.getElementById('nav-btn-admin').classList.add('hidden');
 }
@@ -213,57 +222,38 @@ if (medicoSalvo) {
 }
 
 // Logoff Médico
-document.getElementById('btn-logout-medico').addEventListener('click', () => {
-  medSessaoAtiva = null;
-  salvarMedicoLocal(null);
-  document.getElementById('dashboard-medico').classList.add('hidden');
-  document.getElementById('box-medico-auth').classList.remove('hidden');
-  formLoginMedico.reset();
+const btnLogoutMed = document.getElementById('btn-logout-medico');
+if (btnLogoutMed) {
+  btnLogoutMed.addEventListener('click', () => {
+    medSessaoAtiva = null;
+    salvarMedicoLocal(null);
+    document.getElementById('dashboard-medico').classList.add('hidden');
+    document.getElementById('box-medico-auth').classList.remove('hidden');
+    document.getElementById('nav-btn-paciente').classList.remove('hidden');
+    document.getElementById('nav-btn-admin').classList.remove('hidden');
+  });
+}
 
-  document.getElementById('nav-btn-paciente').classList.remove('hidden');
-  document.getElementById('nav-btn-admin').classList.remove('hidden');
-});
+// Paciente Fila
+const formPac = document.getElementById('form-paciente');
+if (formPac) {
+  formPac.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const dados = {
+      nome: document.getElementById('pac-nome').value,
+      cpf: document.getElementById('pac-cpf').value,
+      endereco: document.getElementById('pac-endereco').value,
+      telefone: document.getElementById('pac-telefone').value,
+      email: document.getElementById('pac-email').value,
+    };
+    
+    socket.emit('entrar-fila', dados);
+    document.getElementById('form-paciente-box').classList.add('hidden');
+    document.getElementById('lobby-paciente').classList.remove('hidden');
+    document.getElementById('main-nav-tabs').classList.add('hidden');
+  });
+}
 
-// Login Admin
-document.getElementById('form-login-admin').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const user = document.getElementById('adm-user').value;
-  const pass = document.getElementById('adm-pass').value;
-
-  if (user === 'Admin' && pass === 'Tr0sH!') {
-    document.getElementById('login-admin-box').classList.add('hidden');
-    document.getElementById('dashboard-admin').classList.remove('hidden');
-    carregarDadosAdmin();
-  } else {
-    alert('Usuário ou senha do Administrador incorretos!');
-  }
-});
-
-// Logoff Admin
-document.getElementById('btn-logout-admin').addEventListener('click', () => {
-  document.getElementById('dashboard-admin').classList.add('hidden');
-  document.getElementById('login-admin-box').classList.remove('hidden');
-  document.getElementById('form-login-admin').reset();
-});
-
-// Paciente entra na fila
-document.getElementById('form-paciente').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const dados = {
-    nome: document.getElementById('pac-nome').value,
-    cpf: document.getElementById('pac-cpf').value,
-    endereco: document.getElementById('pac-endereco').value,
-    telefone: document.getElementById('pac-telefone').value,
-    email: document.getElementById('pac-email').value,
-  };
-  
-  socket.emit('entrar-fila', dados);
-  document.getElementById('form-paciente-box').classList.add('hidden');
-  document.getElementById('lobby-paciente').classList.remove('hidden');
-  document.getElementById('main-nav-tabs').classList.add('hidden');
-});
-
-// Atualizar fila
 socket.on('atualizar-fila', (fila) => {
   const lista = document.getElementById('lista-pacientes-fila');
   const count = document.getElementById('count-fila');
@@ -281,61 +271,6 @@ socket.on('atualizar-fila', (fila) => {
     `;
     lista.appendChild(li);
   });
-});
-
-// Inicialização Estável do PeerJS
-function inicializarPeerJS() {
-  if (peer) return;
-
-  peer = new Peer(socket.id, {
-    debug: 1,
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun.relay.metered.ca:80' },
-        {
-          urls: 'turn:global.relay.metered.ca:80',
-          username: 'e823f6eb7e39ef695420e181',
-          credential: 'K8a2x8C83/aJ9fGL'
-        },
-        {
-          urls: 'turn:global.relay.metered.ca:443',
-          username: 'e823f6eb7e39ef695420e181',
-          credential: 'K8a2x8C83/aJ9fGL'
-        }
-      ]
-    }
-  });
-
-  peer.on('call', async (call) => {
-    currentCall = call;
-    try {
-      if (!localStream) {
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 640 }, height: { ideal: 640 } }, 
-          audio: true 
-        });
-        const locVid = document.getElementById('local-video');
-        locVid.srcObject = localStream;
-        locVid.play().catch(e => console.log('Erro local play:', e));
-      }
-      call.answer(localStream);
-
-      call.on('stream', (remoteStream) => {
-        const remoteVideo = document.getElementById('remote-video');
-        remoteVideo.srcObject = remoteStream;
-        remoteVideo.play().catch(e => console.log('Erro remote play:', e));
-      });
-    } catch (err) {
-      console.error('Erro ao capturar mídia no paciente:', err);
-    }
-  });
-}
-
-socket.on('connect', () => {
-  inicializarPeerJS();
 });
 
 window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
@@ -374,89 +309,40 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-document.getElementById('texto-anamnese').addEventListener('input', (e) => {
-  socket.emit('atualizar-anamnese-temp', e.target.value);
-});
-
 async function iniciarChamadaPeer(targetSocketId) {
-  try {
-    if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 640 }, height: { ideal: 640 } }, 
-        audio: true 
-      });
-      const locVid = document.getElementById('local-video');
-      locVid.srcObject = localStream;
-      locVid.play().catch(e => console.log('Erro local play:', e));
-    }
-
-    const call = peer.call(targetSocketId, localStream);
+  const stream = await obterMidiaLocal();
+  if (stream && peer) {
+    const call = peer.call(targetSocketId, stream);
     currentCall = call;
 
     call.on('stream', (remoteStream) => {
       const remoteVideo = document.getElementById('remote-video');
-      remoteVideo.srcObject = remoteStream;
-      remoteVideo.play().catch(e => console.log('Erro remote play:', e));
+      if (remoteVideo) {
+        remoteVideo.srcObject = remoteStream;
+        remoteVideo.play().catch(e => console.log('Erro play remoto:', e));
+      }
     });
-  } catch (err) {
-    console.error('Erro ao acessar mídia no médico:', err);
   }
 }
 
-// Envio de Arquivos
-document.getElementById('input-arquivo').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append('arquivo', file);
-
-  const res = await fetch('/api/upload', { method: 'POST', body: formData });
-  const data = await res.json();
-  
-  socket.emit('novo-arquivo-enviado', { 
-    targetId: currentConsultation ? currentConsultation.pacienteId : null,
-    file: data 
-  });
-
-  adicionarArquivoNaLista(data);
-});
-
-socket.on('receber-arquivo-medico', (fileData) => {
-  adicionarArquivoNaLista(fileData);
-});
-
-function adicionarArquivoNaLista(data) {
-  arquivosTrocados.push(data);
-  const lista = document.getElementById('lista-arquivos');
-  const emptyMsg = lista.querySelector('.empty-files');
-  if (emptyMsg) emptyMsg.remove();
-
-  lista.innerHTML += `<div style="margin-top:6px; padding:6px; background:var(--bg-color); border-radius:6px; font-size:0.85rem;">📄 <strong>${data.originalname}</strong> - <a href="${data.path}" target="_blank" download style="color:var(--cyan); text-decoration:underline;">Baixar Documento</a></div>`;
-}
-
-// Desconexão e Finalização
+// Finalização Direta sem Bloqueio
 socket.on('parceiro-desconectou', () => {
-  alert('A outra parte se desconectou. A consulta foi encerrada e o relatório salvo automaticamente.');
+  alert('A outra parte se desconectou.');
   limparEVoltarLobby();
 });
 
 socket.on('consulta-encerrada', () => {
-  alert('A consulta foi finalizada.');
+  alert('A consulta foi finalizada com sucesso!');
   limparEVoltarLobby();
 });
 
 function limparEVoltarLobby() {
-  if (currentCall) {
-    currentCall.close();
-    currentCall = null;
-  }
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
+  if (currentCall) { currentCall.close(); currentCall = null; }
+  if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
 
-  document.getElementById('texto-anamnese').value = '';
+  const txtAnamnese = document.getElementById('texto-anamnese');
+  if (txtAnamnese) txtAnamnese.value = '';
+  
   document.getElementById('lista-arquivos').innerHTML = '<p class="empty-files">Nenhum documento anexado ainda.</p>';
   document.getElementById('info-medico-paciente-banner').classList.add('hidden');
   arquivosTrocados = [];
@@ -475,126 +361,11 @@ function limparEVoltarLobby() {
   }
 }
 
-document.getElementById('btn-encerrar-consulta').addEventListener('click', () => {
-  const anamnese = document.getElementById('texto-anamnese').value;
-  socket.emit('finalizar-consulta', { anamnese });
-});
-
-// Painel Admin & Exclusão de Registros
-async function carregarDadosAdmin() {
-  const res = await fetch('/api/admin/dados');
-  const data = await res.json();
-  renderAdminDashboard(data);
-}
-
-socket.on('atualizar-admin-medicos', () => carregarDadosAdmin());
-socket.on('atualizar-admin-pacientes', (data) => {
-  document.getElementById('count-admin-fila').innerText = data.filaAtualCount;
-  renderPacientesAdmin(data.registroPacientesGeral);
-});
-socket.on('atualizar-admin-dashboard', (data) => {
-  document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje;
-  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
-  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
-  document.getElementById('count-admin-fila').innerText = data.filaAtualCount;
-  renderLogsAdmin(data.logsConsultas);
-  renderPacientesAdmin(data.registroPacientesGeral);
-});
-
-function renderAdminDashboard(data) {
-  document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje;
-  document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
-  document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
-  document.getElementById('count-admin-fila').innerText = data.filaAtualCount;
-  renderMedicosAdmin(data.medicos);
-  renderPacientesAdmin(data.registroPacientesGeral);
-  renderLogsAdmin(data.logsConsultas);
-}
-
-window.limparBancoDados = async (tipo) => {
-  if (!confirm(`Tem certeza que deseja apagar os dados da categoria [${tipo}]? Esta ação é irreversível.`)) return;
-  await fetch('/api/admin/limpar-historico', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tipo })
+const btnEncerrar = document.getElementById('btn-encerrar-consulta');
+if (btnEncerrar) {
+  btnEncerrar.addEventListener('click', () => {
+    const txt = document.getElementById('texto-anamnese');
+    const anamnese = txt ? txt.value : '';
+    socket.emit('finalizar-consulta', { anamnese });
   });
-  carregarDadosAdmin();
-};
-
-function renderMedicosAdmin(medicos) {
-  const container = document.getElementById('lista-medicos-admin');
-  if (!container) return;
-  if (!medicos || medicos.length === 0) {
-    container.innerHTML = '<p class="empty-msg">Nenhum médico cadastrado ainda.</p>';
-    return;
-  }
-
-  container.innerHTML = medicos.map(m => `
-    <div class="item-row" style="flex-wrap:wrap; gap:8px;">
-      <div>
-        <strong>${m.nome}</strong> (CRM: ${m.crm}) - Status: <em>${m.status.toUpperCase()}</em>
-      </div>
-      <div>
-        <button class="btn-small" style="background:var(--border); color:var(--text-color);" onclick="verPerfilMedico('${m.nome}', '${m.cpf}', '${m.crm}', '${m.email}', '${m.status}')">Ver Perfil</button>
-        ${m.status === 'pendente' ? `
-          <button class="btn-small btn-success" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Aprovar</button>
-          <button class="btn-small btn-danger" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Negar</button>
-        ` : ''}
-        ${m.status === 'aprovado' ? `
-          <button class="btn-small btn-warn" onclick="alterarStatusMedico('${m.id}', 'bloqueado')">Bloquear</button>
-        ` : ''}
-        ${m.status === 'bloqueado' ? `
-          <button class="btn-small btn-success" onclick="alterarStatusMedico('${m.id}', 'aprovado')">Desbloquear</button>
-        ` : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-window.verPerfilMedico = (nome, cpf, crm, email, status) => {
-  alert(`📋 PERFIL DO MÉDICO:\n\n• Nome: ${nome}\n• CRM: ${crm}\n• CPF: ${cpf}\n• E-mail: ${email}\n• Status: ${status.toUpperCase()}`);
-};
-
-window.alterarStatusMedico = async (medicoId, novoStatus) => {
-  await fetch('/api/admin/medico/status', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ medicoId, novoStatus })
-  });
-  carregarDadosAdmin();
-};
-
-function renderPacientesAdmin(pacientes) {
-  const container = document.getElementById('lista-pacientes-admin');
-  if (!container) return;
-  if (!pacientes || pacientes.length === 0) {
-    container.innerHTML = '<p class="empty-msg">Nenhum paciente registrado ainda.</p>';
-    return;
-  }
-
-  container.innerHTML = pacientes.map(p => `
-    <div class="item-row">
-      <div>
-        <strong>${p.nome}</strong> (CPF: ${p.cpf}) | 📞 ${p.telefone}
-      </div>
-      <div>
-        Entrou: ${p.horaEntrada} | <span class="badge" style="position:static;">${p.status}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderLogsAdmin(logs) {
-  const lista = document.getElementById('lista-logs-consultas');
-  if (!lista) return;
-  if (!logs || logs.length === 0) {
-    lista.innerHTML = '<li class="empty-msg">Nenhum log gravado.</li>';
-    return;
-  }
-  lista.innerHTML = logs.map(l => `
-    <li class="item-row">
-      <span><strong>${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
-      <a href="${l.zipUrl}" class="btn-secondary" style="width:auto; text-decoration:none; padding:4px 10px; font-size:0.8rem;">📦 Baixar .ZIP</a>
-    </li>
-  `).join('');
 }
