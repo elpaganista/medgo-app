@@ -6,6 +6,7 @@ const fs = require('fs');
 const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const archiver = require('archiver');
+const twilio = require('twilio');
 
 process.env.TZ = 'America/Fortaleza';
 
@@ -91,6 +92,28 @@ function obterMedicosComStatus() {
   }));
 }
 
+// ENDPOINT SEGURO DO TWILIO (Manda os servidores TURN sem travar o GitHub Push)
+app.get('/api/get-turn-credentials', async (req, res) => {
+  try {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || 'AC4fc6fa2baf203a2c1239977481743bd7';
+    const authToken = process.env.TWILIO_AUTH_TOKEN || 'a89eb79df8d7cc08604bd4e479bee9';
+    
+    const client = twilio(accountSid, authToken);
+    const token = await client.tokens.create();
+
+    res.json({ iceServers: token.iceServers });
+  } catch (error) {
+    console.error('Erro ao buscar credenciais Twilio:', error);
+    // Fallback de emergência caso a Twilio falhe
+    res.json({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelay', credential: 'openrelay' }
+      ]
+    });
+  }
+});
+
 // Upload de Arquivos
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -164,7 +187,6 @@ app.post('/api/admin/medico/status', (req, res) => {
   }
 });
 
-// Excluir médico pelo Admin
 app.post('/api/admin/medico/excluir', (req, res) => {
   const { medicoId } = req.body;
   medicos = medicos.filter(m => m.id !== medicoId);
@@ -179,13 +201,11 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
   res.status(404).send('Arquivo não encontrado.');
 });
 
-// [CORREÇÃO]: Contabilização de estatísticas e salvamento seguro de logs/zip
 function processarFinalizacaoConsulta(dados) {
   try {
     const dh = obterDataHoraBR();
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
-    // Atualiza contadores de relatórios no servidor
     statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
     statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
     salvarStats(statsGeral);
@@ -252,9 +272,8 @@ function processarFinalizacaoConsulta(dados) {
   } catch (err) { console.error('Erro geral ao finalizar consulta:', err); }
 }
 
-// WebSockets (Sinalização WebRTC)
+// WebSockets
 io.on('connection', (socket) => {
-  // Contabiliza visitas/acessos no dashboard
   statsGeral.totalGeralAcessos += 1;
   salvarStats(statsGeral);
 
@@ -316,7 +335,6 @@ io.on('connection', (socket) => {
       filaAtualCount: filaPacientes.length
     });
     
-    // [CORREÇÃO]: Garante envio do medicoSocketId para o paciente poder direcionar as ofertas WebRTC
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
       sender: socket.id,
@@ -325,7 +343,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // [CORREÇÃO]: Repasse estrito de eventos de sinalização P2P (WebRTC)
   socket.on('webrtc-offer', (data) => {
     if (data && data.target) {
       io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
@@ -348,11 +365,6 @@ io.on('connection', (socket) => {
     const consulta = consultasAtivas.get(socket.id);
     if (consulta) consulta.arquivosTrocados.push(data.file);
     if (data.targetId) io.to(data.targetId).emit('receber-arquivo-medico', data.file);
-  });
-
-  socket.on('atualizar-anamnese-temp', (texto) => {
-    const consulta = consultasAtivas.get(socket.id);
-    if (consulta) consulta.anamnese = texto;
   });
 
   socket.on('finalizar-consulta', (dados) => {
