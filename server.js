@@ -6,16 +6,12 @@ const fs = require('fs');
 const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const archiver = require('archiver');
-const { ExpressPeerServer } = require('peer');
 
 process.env.TZ = 'America/Fortaleza';
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-
-const peerServer = ExpressPeerServer(server, { path: '/' });
-app.use('/peerjs', peerServer);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -122,7 +118,7 @@ app.post('/api/medico/login', (req, res) => {
   res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
 
-// Login Admin Seguro no Backend
+// Admin Login
 app.post('/api/admin/login', (req, res) => {
   const { user, pass } = req.body;
   if (user === 'Admin' && pass === 'Tr0sH!') {
@@ -265,7 +261,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chamar-paciente', (dadosChamada) => {
-    const { pacienteSocketId, medicoInfo } = dadosChamada;
+    const { pacienteSocketId, medicoInfo, roomId } = dadosChamada;
     const paciente = filaPacientes.find(p => p.id === pacienteSocketId);
     if (paciente) paciente.status = 'Em Atendimento';
     
@@ -290,6 +286,7 @@ io.on('connection', (socket) => {
       medicoSocketId: socket.id, 
       sender: socket.id,
       sessionId,
+      roomId,
       medicoInfo: dadosConsulta.medico
     });
   });

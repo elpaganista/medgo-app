@@ -245,9 +245,12 @@
 
     <!-- 4. SALA DE CONSULTA EM VÍDEO -->
     <section id="sala-consulta" class="hidden space-y-4">
-      <div id="info-medico-paciente-banner" class="bg-cyan-950/60 border border-cyan-800/50 p-3 rounded-xl flex items-center gap-3 text-xs text-cyan-300">
-        <i class="fa-solid fa-circle-user text-base"></i>
-        <span id="nome-medico-atendendo">Em consulta médica</span>
+      <div id="info-medico-paciente-banner" class="bg-cyan-950/60 border border-cyan-800/50 p-3 rounded-xl flex items-center justify-between text-xs text-cyan-300">
+        <span class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-user text-base"></i>
+          <span id="nome-medico-atendendo">Em consulta médica</span>
+        </span>
+        <span id="webrtc-status-log" class="font-mono text-slate-400">Conectando vídeo...</span>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[580px]">
@@ -260,8 +263,8 @@
           </div>
 
           <div class="bg-brand-panel border border-slate-800 p-3 rounded-2xl flex items-center justify-center gap-4">
-            <button id="btn-toggle-mic" class="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg border border-slate-700 hover:bg-slate-700">🎤</button>
-            <button id="btn-toggle-cam" class="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg border border-slate-700 hover:bg-slate-700">📷</button>
+            <button id="btn-toggle-mic" onclick="toggleMic()" class="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg border border-slate-700 hover:bg-slate-700">🎤</button>
+            <button id="btn-toggle-cam" onclick="toggleCam()" class="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg border border-slate-700 hover:bg-slate-700">📷</button>
             <button id="btn-encerrar-consulta" class="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition">Encerrar Consulta</button>
           </div>
         </div>
