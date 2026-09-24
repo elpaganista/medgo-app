@@ -12,7 +12,7 @@ let camAtiva = true;
 let candidatosPendentes = [];
 let remoteStream = null;
 
-// Servidores TURN/STUN para Conexões Internacionais
+// Servidores STUN/TURN Globais com suporte a TCP/UDP
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -33,21 +33,6 @@ const rtcConfig = {
       urls: 'turns:openrelay.metered.ca:443?transport=tcp',
       username: 'openrelay',
       credential: 'openrelay'
-    },
-    {
-      urls: 'turn:global.relay.metered.ca:80',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
-    },
-    {
-      urls: 'turn:global.relay.metered.ca:443',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
-    },
-    {
-      urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-      username: 'e823f6eb7e39ef695420e181',
-      credential: 'K8a2x8C83/aJ9fGL'
     }
   ]
 };
@@ -77,7 +62,6 @@ document.querySelectorAll('#pac-cpf, #med-login-cpf, #med-cad-cpf').forEach(inpu
 const pacTel = document.getElementById('pac-telefone');
 if (pacTel) pacTel.addEventListener('input', aplicarMascaraTelefone);
 
-// Sessão Médica Local
 function obterMedicoSalvoLocal() {
   try { return JSON.parse(localStorage.getItem('medgo_medico_sessao')); } catch(e) { return null; }
 }
@@ -86,7 +70,6 @@ function salvarMedicoLocal(medico) {
   else localStorage.removeItem('medgo_medico_sessao');
 }
 
-// Tema
 const btnTema = document.getElementById('btn-tema');
 if (btnTema) {
   btnTema.addEventListener('click', () => {
@@ -95,7 +78,6 @@ if (btnTema) {
   });
 }
 
-// Controle de Navegação das Abas
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -110,38 +92,27 @@ tabButtons.forEach(btn => {
   });
 });
 
-// Captura de Mídia Adaptativa
+// CAPTURA DE MÍDIA LOCAL
 async function obterMidiaLocal() {
   if (localStream) return localStream;
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert('Este navegador não permite acessar câmera e microfone. Abra o site por HTTPS (ou localhost).');
+    alert('Este navegador não suporta acesso à câmera e microfone.');
     return null;
   }
 
-  const tentativas = [
-    {
-      video: { width: { min: 320, ideal: 640 }, height: { min: 240, ideal: 480 }, facingMode: "user" },
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
       audio: true
-    },
-    { video: true, audio: true }
-  ];
-
-  let ultimoErro = null;
-  for (const constraints of tentativas) {
+    });
+  } catch (err) {
     try {
-      localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      break;
-    } catch (err) {
-      ultimoErro = err;
-      if (err && err.name === 'NotAllowedError') break;
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    } catch (e) {
+      alert('Por favor, permita o acesso à Câmera e Microfone.');
+      return null;
     }
-  }
-
-  if (!localStream) {
-    alert('Aviso: Permita o acesso à Câmera e ao Microfone nas configurações do navegador.');
-    console.error('Erro de mídia:', ultimoErro);
-    return null;
   }
 
   const locVid = document.getElementById('local-video');
@@ -158,34 +129,19 @@ function tocarVideoRemoto(video) {
   video.playsInline = true;
   const p = video.play();
   if (p && p.catch) {
-    p.catch(err => {
-      console.log('Erro play remoto:', err);
-      if (err && err.name === 'NotAllowedError') mostrarBotaoAtivarMidia(video);
-    });
+    p.catch(err => console.log('Erro play remoto:', err));
   }
-}
-
-function mostrarBotaoAtivarMidia(video) {
-  if (document.getElementById('btn-ativar-midia')) return;
-  const box = video.parentElement;
-  if (!box) return;
-  const btn = document.createElement('button');
-  btn.id = 'btn-ativar-midia';
-  btn.type = 'button';
-  btn.textContent = '▶ Toque para ativar vídeo e áudio';
-  btn.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; padding:12px 18px; border:none; border-radius:8px; background:#8b5cf6; color:#fff; font-weight:600; cursor:pointer;';
-  btn.addEventListener('click', () => {
-    video.play().then(() => btn.remove()).catch(e => console.log('Erro play remoto:', e));
-  });
-  box.appendChild(btn);
 }
 
 async function aplicarCandidatosPendentes() {
   if (!peerConnection || !peerConnection.remoteDescription) return;
-  const lista = candidatosPendentes;
-  candidatosPendentes = [];
-  for (const c of lista) {
-    try { await peerConnection.addIceCandidate(new RTCIceCandidate(c)); } catch (e) { console.warn('Erro ao adicionar ICE pendente:', e); }
+  while (candidatosPendentes.length > 0) {
+    const candidate = candidatosPendentes.shift();
+    try {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+      console.warn('Erro ao aplicar ICE:', e);
+    }
   }
 }
 
@@ -199,25 +155,23 @@ function criarPeerConnection(outroSocketId) {
     });
   }
 
-  remoteStream = null;
+  remoteStream = new MediaStream();
+  const remoteVideo = document.getElementById('remote-video');
+  if (remoteVideo) {
+    remoteVideo.srcObject = remoteStream;
+  }
 
   peerConnection.ontrack = (event) => {
-    const remoteVideo = document.getElementById('remote-video');
-    if (!remoteVideo) return;
-
-    let stream = event.streams && event.streams[0];
-    if (!stream) {
-      if (!remoteStream) remoteStream = new MediaStream();
+    if (event.streams && event.streams[0]) {
+      event.streams[0].getTracks().forEach(track => {
+        if (!remoteStream.getTracks().includes(track)) {
+          remoteStream.addTrack(track);
+        }
+      });
+    } else if (event.track) {
       remoteStream.addTrack(event.track);
-      stream = remoteStream;
     }
-
-    if (remoteVideo.srcObject !== stream) remoteVideo.srcObject = stream;
-    tocarVideoRemoto(remoteVideo);
-  };
-
-  peerConnection.oniceconnectionstatechange = () => {
-    console.log('ICE state:', peerConnection && peerConnection.iceConnectionState);
+    if (remoteVideo) tocarVideoRemoto(remoteVideo);
   };
 
   peerConnection.onicecandidate = (event) => {
@@ -229,18 +183,17 @@ function criarPeerConnection(outroSocketId) {
 
 socket.on('webrtc-offer', async (data) => {
   targetSocketId = data.sender;
-
-  if (peerConnection) { peerConnection.close(); peerConnection = null; }
   candidatosPendentes = [];
 
-  await obtainingMidiaLocal();
+  await obterMidiaLocal();
   criarPeerConnection(targetSocketId);
+
   await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
   await aplicarCandidatosPendentes();
-  
+
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
-  
+
   socket.emit('webrtc-answer', { target: targetSocketId, sdp: answer });
 });
 
@@ -254,13 +207,15 @@ socket.on('webrtc-answer', async (data) => {
 socket.on('webrtc-ice-candidate', async (data) => {
   if (!data.candidate) return;
   if (peerConnection && peerConnection.remoteDescription) {
-    try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn('Erro ao adicionar ICE:', e); }
+    try {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    } catch (e) {}
   } else {
     candidatosPendentes.push(data.candidate);
   }
 });
 
-// Lista de Médicos na Sidebar Lateral
+// LISTA DE MÉDICOS
 socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   const containerPaciente = document.getElementById('lista-medicos-status-paciente');
   if (containerPaciente) {
@@ -280,16 +235,14 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
     }
   }
 
-  // Atualiza também a tabela de médicos no painel Admin se estiver aberto
   renderMedicosAdmin(listaMedicos);
 });
 
-// Atualização Geral do Admin em Tempo Real
 socket.on('atualizar-admin-dashboard', (data) => {
   renderAdminDashboard(data);
 });
 
-// Cadastro de Médico
+// CADASTRO MÉDICO
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
 if (formCadastroMedico) {
   formCadastroMedico.addEventListener('submit', async (e) => {
@@ -313,7 +266,7 @@ if (formCadastroMedico) {
   });
 }
 
-// Login Médico
+// LOGIN MÉDICO
 const formLoginMedico = document.getElementById('form-login-medico');
 if (formLoginMedico) {
   formLoginMedico.addEventListener('submit', async (e) => {
@@ -366,7 +319,6 @@ if (btnMedLoginView && btnMedCadView) {
   });
 }
 
-// Logoff Médico
 const btnLogoutMed = document.getElementById('btn-logout-medico');
 if (btnLogoutMed) {
   btnLogoutMed.addEventListener('click', () => {
@@ -378,7 +330,7 @@ if (btnLogoutMed) {
   });
 }
 
-// Login Admin
+// LOGIN ADMIN
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
   formAdmin.addEventListener('submit', (e) => {
@@ -404,7 +356,7 @@ if (btnLogoutAdmin) {
   });
 }
 
-// Fila do Paciente
+// FILA PACIENTE
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -446,6 +398,7 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   targetSocketId = pacienteSocketId;
   candidatosPendentes = [];
   currentConsultation = { pacienteId: pacienteSocketId, nome, cpf, sessionId: Date.now() };
+  
   socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medSessaoAtiva });
   configurarInterfaceConsulta(true);
   
@@ -458,7 +411,7 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   socket.emit('webrtc-offer', { target: targetSocketId, sdp: offer });
 };
 
-socket.on('chamado-para-consulta', (dados) => {
+socket.on('chamado-para-consulta', async (dados) => {
   targetSocketId = dados.medicoSocketId || dados.sender;
   alert('O médico chamou para a consulta!');
   document.getElementById('tab-paciente').classList.add('hidden');
@@ -469,6 +422,7 @@ socket.on('chamado-para-consulta', (dados) => {
   }
   
   configurarInterfaceConsulta(false);
+  await obterMidiaLocal();
 });
 
 function configurarInterfaceConsulta(isDoctor) {
@@ -487,7 +441,6 @@ function configurarInterfaceConsulta(isDoctor) {
   }
 }
 
-// Finalização
 socket.on('parceiro-desconectou', () => {
   alert('A outra parte se desconectou.');
   limparEVoltarLobby();
@@ -508,8 +461,6 @@ function limparEVoltarLobby() {
   
   const remotoVid = document.getElementById('remote-video');
   if (remotoVid) remotoVid.srcObject = null;
-  const btnAtivar = document.getElementById('btn-ativar-midia');
-  if (btnAtivar) btnAtivar.remove();
   
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
@@ -546,10 +497,7 @@ if (btnEncerrar) {
   });
 }
 
-// ==========================================
-// PAINEL ADMIN: APROVAR, NEGAR, BLOQUEAR E EXCLUIR
-// ==========================================
-
+// ADMIN DASHBOARD
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
