@@ -654,3 +654,72 @@ window.excluirMedicoAdmin = async (medicoId) => {
     body: JSON.stringify({ medicoId })
   });
 };
+// Listener para Upload e Envio de Documentos pelo Médico
+const inputArquivo = document.getElementById('input-arquivo');
+if (inputArquivo) {
+  inputArquivo.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('arquivo', file);
+
+    try {
+      // 1. Faz o upload físico para a pasta /uploads do servidor
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const fileData = {
+          filename: data.filename,
+          originalname: data.originalname,
+          path: data.path
+        };
+
+        // 2. Registra na lista local
+        adicionarArquivoNaLista(fileData);
+
+        // 3. Notifica o paciente em tempo real via Socket.IO
+        socket.emit('novo-arquivo-enviado', {
+          targetId: targetSocketId,
+          file: fileData
+        });
+
+        alert('Documento enviado ao paciente com sucesso!');
+      } else {
+        alert(data.error || 'Erro ao enviar arquivo.');
+      }
+    } catch (err) {
+      console.error('Erro no upload:', err);
+      alert('Erro de conexão ao enviar arquivo.');
+    }
+  });
+}
+
+// Escuta o recebimento de arquivos do médico no lado do paciente
+socket.on('receber-arquivo-medico', (fileData) => {
+  adicionarArquivoNaLista(fileData);
+  alert(`Você recebeu um novo documento: ${fileData.originalname}`);
+});
+
+// Função para renderizar o link de download na tela do chat
+function adicionarArquivoNaLista(file) {
+  const container = document.getElementById('lista-arquivos');
+  if (!container) return;
+
+  const emptyMsg = container.querySelector('.empty-files');
+  if (emptyMsg) emptyMsg.remove();
+
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  div.style.cssText = 'margin-bottom:8px; padding:8px; background:var(--bg-color); border-radius:6px;';
+  div.innerHTML = `
+    <span>📄 <strong>${file.originalname}</strong></span>
+    <a href="${file.path}" target="_blank" download class="btn-small btn-success" style="text-decoration:none;">Baixar</a>
+  `;
+  container.appendChild(div);
+}
