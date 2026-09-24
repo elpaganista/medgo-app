@@ -9,11 +9,28 @@ let arquivosTrocados = [];
 let micAtivo = true;
 let camAtiva = true;
 
+// Servidores TURN/STUN Profissionais e Abertos para Romper Firewalls Globais
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    {
+      urls: 'turn:global.relay.metered.ca:80',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
+    },
+    {
+      urls: 'turn:global.relay.metered.ca:443',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
+    },
+    {
+      urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+      username: 'e823f6eb7e39ef695420e181',
+      credential: 'K8a2x8C83/aJ9fGL'
+    }
   ]
 };
 
@@ -60,7 +77,7 @@ if (btnTema) {
   });
 }
 
-// Controle de Navegação das Abas (Sempre Visíveis)
+// Controle de Navegação das Abas
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -75,12 +92,16 @@ tabButtons.forEach(btn => {
   });
 });
 
-// Captura de Mídia
+// Captura de Mídia Adaptativa
 async function obterMidiaLocal() {
   if (localStream) return localStream;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+      video: {
+        width: { min: 320, ideal: 640 },
+        height: { min: 240, ideal: 480 },
+        facingMode: "user"
+      },
       audio: true
     });
     const locVid = document.getElementById('local-video');
@@ -91,13 +112,14 @@ async function obterMidiaLocal() {
     }
     return localStream;
   } catch (err) {
-    alert('Permita o acesso à Câmera e Microfone para realizar a consulta.');
+    alert('Aviso: Permita o acesso à Câmera e ao Microfone nas configurações do navegador.');
     console.error('Erro de mídia:', err);
     return null;
   }
 }
 
 function criarPeerConnection(outroSocketId) {
+  if (peerConnection) peerConnection.close();
   peerConnection = new RTCPeerConnection(rtcConfig);
 
   if (localStream) {
@@ -145,7 +167,7 @@ socket.on('webrtc-ice-candidate', async (data) => {
   }
 });
 
-// Lista de Médicos na Sidebar Lateral
+// Lista de Médicos na Sidebar
 socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   const containerPaciente = document.getElementById('lista-medicos-status-paciente');
   if (containerPaciente) {
@@ -164,12 +186,14 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
       `).join('');
     }
   }
-
-  // Renderizar Médicos na Gestão Admin
-  renderMedicosAdmin(listaMedicos);
 });
 
-// Cadastro de Médico (Garantido)
+// Atualização Completa do Admin em Tempo Real
+socket.on('atualizar-admin-dashboard', (data) => {
+  renderAdminDashboard(data);
+});
+
+// Cadastro de Médico
 const formCadastroMedico = document.getElementById('form-cadastro-medico');
 if (formCadastroMedico) {
   formCadastroMedico.addEventListener('submit', async (e) => {
@@ -227,7 +251,7 @@ function ativarPainelMedico(medico) {
   document.getElementById('dashboard-medico').classList.remove('hidden');
 }
 
-// Alternar entre Login e Cadastro na aba Médica
+// Alternar entre Login e Cadastro
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 
@@ -415,7 +439,7 @@ if (btnEncerrar) {
   });
 }
 
-// Painel Admin & Exclusão de Médico
+// Painel Admin & Exclusão
 async function carregarDadosAdmin() {
   const res = await fetch('/api/admin/dados');
   const data = await res.json();
@@ -423,11 +447,15 @@ async function carregarDadosAdmin() {
 }
 
 function renderAdminDashboard(data) {
+  if (!data) return;
   document.getElementById('count-atendimentos-hoje').innerText = data.atendimentosHoje || 0;
   document.getElementById('count-atendimentos-mes').innerText = data.atendimentosMes || 0;
   document.getElementById('count-total-acessos').innerText = data.totalGeralAcessos || 0;
   document.getElementById('count-admin-fila').innerText = data.filaAtualCount || 0;
-  renderMedicosAdmin(data.medicos);
+  
+  if (data.medicos) renderMedicosAdmin(data.medicos);
+  if (data.registroPacientesGeral) renderPacientesAdmin(data.registroPacientesGeral);
+  if (data.logsConsultas) renderLogsAdmin(data.logsConsultas);
 }
 
 function renderMedicosAdmin(medicos) {
@@ -460,13 +488,47 @@ function renderMedicosAdmin(medicos) {
   `).join('');
 }
 
+function renderPacientesAdmin(pacientes) {
+  const container = document.getElementById('lista-pacientes-admin');
+  if (!container) return;
+  if (!pacientes || pacientes.length === 0) {
+    container.innerHTML = '<p class="empty-msg">Nenhum paciente registrado ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = pacientes.map(p => `
+    <div class="item-row">
+      <div>
+        <strong>${p.nome}</strong> (CPF: ${p.cpf}) | 📞 ${p.telefone}
+      </div>
+      <div>
+        Entrou: ${p.horaEntrada} | <span class="badge" style="position:static;">${p.status}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderLogsAdmin(logs) {
+  const lista = document.getElementById('lista-logs-consultas');
+  if (!lista) return;
+  if (!logs || logs.length === 0) {
+    lista.innerHTML = '<li class="empty-msg">Nenhum log gravado.</li>';
+    return;
+  }
+  lista.innerHTML = logs.map(l => `
+    <li class="item-row">
+      <span><strong>${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
+      <a href="${l.zipUrl}" class="btn-secondary" style="width:auto; text-decoration:none; padding:4px 10px; font-size:0.8rem;">📦 Baixar .ZIP</a>
+    </li>
+  `).join('');
+}
+
 window.alterarStatusMedico = async (medicoId, novoStatus) => {
   await fetch('/api/admin/medico/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ medicoId, novoStatus })
   });
-  carregarDadosAdmin();
 };
 
 window.excluirMedicoAdmin = async (medicoId) => {
@@ -476,5 +538,4 @@ window.excluirMedicoAdmin = async (medicoId) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ medicoId })
   });
-  carregarDadosAdmin();
 };

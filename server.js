@@ -78,6 +78,14 @@ function obterDataHoraBR() {
   };
 }
 
+function registrarAcessoEAtendimento() {
+  const dh = obterDataHoraBR();
+  statsGeral.totalGeralAcessos = (statsGeral.totalGeralAcessos || 0) + 1;
+  statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
+  statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
+  salvarStats(statsGeral);
+}
+
 function obterMedicosComStatus() {
   const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
   return medicos.map(m => ({
@@ -91,6 +99,19 @@ function obterMedicosComStatus() {
   }));
 }
 
+function obterDadosAdminPayload() {
+  const dh = obterDataHoraBR();
+  return {
+    medicos: obterMedicosComStatus(),
+    logsConsultas,
+    registroPacientesGeral,
+    atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+    atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
+    totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
+    filaAtualCount: filaPacientes.length
+  };
+}
+
 // Upload de Arquivos
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -101,7 +122,7 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   });
 });
 
-// Cadastro de Médico (Corrigido)
+// Cadastro de Médico
 app.post('/api/medico/cadastro', (req, res) => {
   try {
     const { nome, cpf, email, crm, senha } = req.body;
@@ -118,6 +139,7 @@ app.post('/api/medico/cadastro', (req, res) => {
     salvarMedicos(medicos);
 
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
     res.json({ success: true, message: 'Cadastro enviado com sucesso! Aguarde aprovação do Admin.' });
   } catch (err) {
     console.error("Erro no cadastro:", err);
@@ -139,16 +161,7 @@ app.post('/api/medico/login', (req, res) => {
 
 // Admin Endpoints
 app.get('/api/admin/dados', (req, res) => {
-  const dh = obterDataHoraBR();
-  res.json({
-    medicos: obterMedicosComStatus(),
-    logsConsultas,
-    registroPacientesGeral,
-    atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
-    atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
-    totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
-    filaAtualCount: filaPacientes.length
-  });
+  res.json(obterDadosAdminPayload());
 });
 
 app.post('/api/admin/medico/status', (req, res) => {
@@ -158,18 +171,19 @@ app.post('/api/admin/medico/status', (req, res) => {
     medico.status = novoStatus;
     salvarMedicos(medicos);
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
     res.json({ success: true });
   } else {
     res.status(404).json({ error: 'Médico não encontrado.' });
   }
 });
 
-// EXCLUIR MÉDICO PELO ADMIN
 app.post('/api/admin/medico/excluir', (req, res) => {
   const { medicoId } = req.body;
   medicos = medicos.filter(m => m.id !== medicoId);
   salvarMedicos(medicos);
   io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
   res.json({ success: true, message: 'Médico excluído com sucesso.' });
 });
 
@@ -181,6 +195,7 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
 
 function processarFinalizacaoConsulta(dados) {
   try {
+    registrarAcessoEAtendimento();
     const dh = obterDataHoraBR();
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
@@ -232,24 +247,18 @@ function processarFinalizacaoConsulta(dados) {
           const pGeral = registroPacientesGeral.find(p => p.cpf === paciente?.cpf);
           if (pGeral) pGeral.status = 'Atendido';
 
-          io.emit('atualizar-admin-dashboard', {
-            logsConsultas,
-            atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
-            atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
-            totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
-            registroPacientesGeral,
-            filaAtualCount: filaPacientes.length
-          });
+          io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
         });
       } catch (e) { console.error(e); }
     });
   } catch (err) { console.error(err); }
 }
 
-// WebSockets
+// WebSockets & Sinalização WebRTC com Suporte TURN
 io.on('connection', (socket) => {
   socket.emit('atualizar-fila', filaPacientes);
   socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  socket.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
 
   socket.on('medico-online', (medico) => {
     medicosOnline.set(socket.id, medico);
@@ -273,10 +282,7 @@ io.on('connection', (socket) => {
     registroPacientesGeral.push(paciente);
     
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-admin-pacientes', {
-      registroPacientesGeral,
-      filaAtualCount: filaPacientes.length
-    });
+    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
   });
 
   socket.on('chamar-paciente', (dadosChamada) => {
@@ -301,10 +307,7 @@ io.on('connection', (socket) => {
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-admin-pacientes', {
-      registroPacientesGeral,
-      filaAtualCount: filaPacientes.length
-    });
+    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
     
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
@@ -313,6 +316,7 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Troca das Ofertas e Respostas do WebRTC
   socket.on('webrtc-offer', (data) => {
     io.to(data.target).emit('webrtc-offer', { sender: socket.id, sdp: data.sdp });
   });
@@ -367,6 +371,7 @@ io.on('connection', (socket) => {
 
     io.emit('atualizar-fila', filaPacientes);
     io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    io.emit('atualizar-admin-dashboard', obterDadosAdminPayload());
   });
 });
 
