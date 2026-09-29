@@ -8,16 +8,70 @@ let medSessaoAtiva = null;
 let currentRoomId = null;
 let pendingCandidates = [];
 
-// MODAL E GERENCIAMENTO LGPD
+// 1. CARREGA A MARCA DO MUNICÍPIO DINAMICAMENTE (MULTI-TENANT)
+async function carregarMarcaTenant() {
+  try {
+    const res = await fetch('/api/tenant/info');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.innerText = `${data.nome} - Telemedicina`;
+
+    const subEl = document.getElementById('tenant-subtitulo');
+    if (subEl) subEl.innerText = data.subtitulo || 'TELEMEDICINA';
+
+    const badgeEl = document.getElementById('tenant-badge');
+    if (badgeEl) badgeEl.innerText = data.badge || 'SAÚDE DIGITAL';
+
+    const nomeHeader = document.getElementById('tenant-nome-header');
+    if (nomeHeader) nomeHeader.innerText = `Atendimento - ${data.nome}`;
+
+    const lobbyHeader = document.getElementById('tenant-lobby-header');
+    if (lobbyHeader) lobbyHeader.innerText = `Sala de Espera Virtual - ${data.nome}`;
+
+    const medicoFilaHeader = document.getElementById('medico-fila-header');
+    if (medicoFilaHeader) medicoFilaHeader.innerText = `Fila de Atendimento - ${data.nome}`;
+
+    const adminLoginHeader = document.getElementById('admin-login-header');
+    if (adminLoginHeader) adminLoginHeader.innerText = `Gestão - ${data.nome}`;
+
+    const adminDashHeader = document.getElementById('admin-dash-header');
+    if (adminDashHeader) adminDashHeader.innerText = `Gestão Geral - ${data.nome}`;
+
+    const logoImg = document.getElementById('tenant-logo');
+    const titleText = document.getElementById('tenant-title-text');
+
+    if (data.logo && logoImg) {
+      logoImg.src = data.logo;
+      logoImg.classList.remove('hidden');
+      if (titleText) titleText.classList.add('hidden');
+    } else {
+      if (logoImg) logoImg.classList.add('hidden');
+      if (titleText) {
+        titleText.innerText = data.nome;
+        titleText.classList.remove('hidden');
+      }
+    }
+  } catch (err) {
+    console.warn('Usando marca padrão MedGo:', err);
+  }
+}
+
+carregarMarcaTenant();
+
+// 2. MODAL E PRIVACIDADE LGPD
 function abrirModalPrivacidade() {
-  document.getElementById('modal-privacidade').classList.remove('hidden');
+  const modal = document.getElementById('modal-privacidade');
+  if (modal) modal.classList.remove('hidden');
 }
 
 function fecharModalPrivacidade() {
-  document.getElementById('modal-privacidade').classList.add('hidden');
+  const modal = document.getElementById('modal-privacidade');
+  if (modal) modal.classList.add('hidden');
 }
 
-// GERENCIAMENTO DE TEMA CLARO/ESCURO
+// 3. GERENCIAMENTO DE TEMA CLARO/ESCURO
 function initTheme() {
   const savedTheme = localStorage.getItem('theme');
   const icon = document.getElementById('theme-icon');
@@ -46,7 +100,7 @@ function toggleTheme() {
 
 initTheme();
 
-// CONFIGURAÇÃO WEBRTC: STUN + TURN
+// 4. CONFIGURAÇÃO WEBRTC: STUN + TURN
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -122,7 +176,7 @@ async function aplicarCandidatosPendentes() {
   }
 }
 
-// INICIALIZA CONEXÃO WEBRTC
+// 5. INICIALIZA A CONEXÃO WEBRTC
 async function iniciarWebRTCNativo(roomId, isDoctor) {
   if (rtcPeer) {
     try { rtcPeer.close(); } catch(e){}
@@ -213,7 +267,7 @@ socket.on('webrtc-candidate', async (data) => {
   }
 });
 
-// ALTERNAR MÉDICO LOGIN / CADASTRO
+// 6. ALTERNAR MÉDICO LOGIN / CADASTRO
 const btnMedLoginView = document.getElementById('btn-med-login-view');
 const btnMedCadView = document.getElementById('btn-med-cad-view');
 const formLoginMedico = document.getElementById('form-login-medico');
@@ -223,15 +277,15 @@ if (btnMedLoginView && btnMedCadView) {
   btnMedLoginView.addEventListener('click', () => {
     btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-500 dark:border-cyan-400";
     btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-slate-800 dark:hover:text-white";
-    formLoginMedico.classList.remove('hidden');
-    formCadastroMedico.classList.add('hidden');
+    if (formLoginMedico) formLoginMedico.classList.remove('hidden');
+    if (formCadastroMedico) formCadastroMedico.classList.add('hidden');
   });
 
   btnMedCadView.addEventListener('click', () => {
     btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-500 dark:border-cyan-400";
     btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-slate-800 dark:hover:text-white";
-    formCadastroMedico.classList.remove('hidden');
-    formLoginMedico.classList.add('hidden');
+    if (formCadastroMedico) formCadastroMedico.classList.remove('hidden');
+    if (formLoginMedico) formLoginMedico.classList.add('hidden');
   });
 }
 
@@ -312,7 +366,7 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   renderMedicosAdmin(listaMedicos);
 });
 
-// FILA PACIENTE LGPD VALIDADO
+// 7. FILA PACIENTE (LGPD VALIDADO)
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -444,7 +498,7 @@ function toggleCam() {
   }
 }
 
-// ADMIN DASHBOARD
+// 8. ADMIN DASHBOARD
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
   formAdmin.addEventListener('submit', async (e) => {
@@ -567,7 +621,7 @@ window.excluirMedicoAdmin = async (medicoId) => {
   carregarDadosAdmin();
 };
 
-// UPLOAD DE DOCUMENTOS
+// 9. UPLOAD DE DOCUMENTOS
 const inputArquivo = document.getElementById('input-arquivo');
 if (inputArquivo) {
   inputArquivo.addEventListener('change', async (e) => {

@@ -1,20 +1,26 @@
 {
   "default": {
-    "id": "paracuru",
-    "nome": "Prefeitura de Paracuru",
-    "subtitulo": "Secretaria Municipal de Saúde",
-    "logo": "/images/paracuru-logo.png",
-    "corPrimaria": "#2B6CB0",
-    "corSecundaria": "#2F855A",
-    "corDestaque": "#D69E2E"
+    "id": "medgo",
+    "nome": "MedGo Telemedicina",
+    "subtitulo": "Plataforma de Saúde Digital",
+    "logo": "/images/medgo-logo.png",
+    "badge": "TELEMEDICINA",
+    "corPrimaria": "#06b6d4"
   },
   "paracuru": {
     "id": "paracuru",
     "nome": "Prefeitura de Paracuru",
     "subtitulo": "Secretaria Municipal de Saúde",
     "logo": "/images/paracuru-logo.png",
-    "corPrimaria": "#2B6CB0",
-    "corSecundaria": "#2F855A",
-    "corDestaque": "#D69E2E"
+    "badge": "PARACURU",
+    "corPrimaria": "#2B6CB0"
+  },
+  "palmacia": {
+    "id": "palmacia",
+    "nome": "Prefeitura de Palmácia",
+    "subtitulo": "Secretaria Municipal de Saúde",
+    "logo": "/images/palmacia-logo.png",
+    "badge": "PALMÁCIA",
+    "corPrimaria": "#059669"
   }
 }

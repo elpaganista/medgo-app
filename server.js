@@ -18,14 +18,39 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ISOLAMENTO DE BANCO DE DADOS POR MUNICÍPIO / TENANT (PARACURU)
+// TENANTS MULTI-DOMÍNIO
+const FILE_TENANTS = path.join(__dirname, 'data', 'tenants.json');
+
+function carregarTenants() {
+  if (!fs.existsSync(FILE_TENANTS)) {
+    const padrao = {
+      "default": { id: "medgo", nome: "MedGo Telemedicina", subtitulo: "Plataforma de Saúde Digital", badge: "TELEMEDICINA" },
+      "paracuru": { id: "paracuru", nome: "Prefeitura de Paracuru", subtitulo: "Secretaria Municipal de Saúde", badge: "PARACURU", logo: "/images/paracuru-logo.png" },
+      "palmacia": { id: "palmacia", nome: "Prefeitura de Palmácia", subtitulo: "Secretaria Municipal de Saúde", badge: "PALMÁCIA", logo: "/images/palmacia-logo.png" }
+    };
+    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+    fs.writeFileSync(FILE_TENANTS, JSON.stringify(padrao, null, 2));
+    return padrao;
+  }
+  try { return JSON.parse(fs.readFileSync(FILE_TENANTS, 'utf8')); } catch (err) { return {}; }
+}
+
+let tenants = carregarTenants();
+
+function identificarTenantKey(req) {
+  const host = (req.headers.host || '').toLowerCase();
+  if (host.includes('paracuru')) return 'paracuru';
+  if (host.includes('palmacia')) return 'palmacia';
+  return 'default';
+}
+
 function getTenantPath(tenantId, fileName) {
   const dir = path.join(__dirname, 'data', tenantId);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, fileName);
 }
 
-['uploads', 'logs', 'data', path.join('data', 'paracuru')].forEach(dir => {
+['uploads', 'logs', 'data'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -35,36 +60,33 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-const FILE_MEDICOS = getTenantPath('paracuru', 'medicos.json');
-const FILE_STATS = getTenantPath('paracuru', 'estatisticas.json');
-
-function carregarMedicos() {
-  if (!fs.existsSync(FILE_MEDICOS)) {
-    fs.writeFileSync(FILE_MEDICOS, JSON.stringify([], null, 2));
+function carregarMedicos(tenantId) {
+  const file = getTenantPath(tenantId, 'medicos.json');
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify([], null, 2));
     return [];
   }
-  try { return JSON.parse(fs.readFileSync(FILE_MEDICOS, 'utf8')); } catch (err) { return []; }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return []; }
 }
 
-function salvarMedicos(lista) {
-  try { fs.writeFileSync(FILE_MEDICOS, JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
+function salvarMedicos(tenantId, lista) {
+  try { fs.writeFileSync(getTenantPath(tenantId, 'medicos.json'), JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
 }
 
-function carregarStats() {
+function carregarStats(tenantId) {
+  const file = getTenantPath(tenantId, 'estatisticas.json');
   const padrao = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
-  if (!fs.existsSync(FILE_STATS)) {
-    fs.writeFileSync(FILE_STATS, JSON.stringify(padrao, null, 2));
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify(padrao, null, 2));
     return padrao;
   }
-  try { return { ...padrao, ...JSON.parse(fs.readFileSync(FILE_STATS, 'utf8')) }; } catch (err) { return padrao; }
+  try { return { ...padrao, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch (err) { return padrao; }
 }
 
-function salvarStats(stats) {
-  try { fs.writeFileSync(FILE_STATS, JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
+function salvarStats(tenantId, stats) {
+  try { fs.writeFileSync(getTenantPath(tenantId, 'estatisticas.json'), JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
 }
 
-let medicos = carregarMedicos();
-let statsGeral = carregarStats();
 let filaPacientes = [];
 let registroPacientesGeral = [];
 let consultasAtivas = new Map();
@@ -81,7 +103,8 @@ function obterDataHoraBR() {
   };
 }
 
-function obterMedicosComStatus() {
+function obterMedicosComStatus(tenantId) {
+  const medicos = carregarMedicos(tenantId);
   const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
   return medicos.map(m => ({
     id: m.id,
@@ -94,8 +117,12 @@ function obterMedicosComStatus() {
   }));
 }
 
-// ROTA DE SUBLINK/SUBDOMÍNIO PARA PARACURU
-app.use('/paracuru', express.static(path.join(__dirname, 'public')));
+// ENDPOINTS DA API
+app.get('/api/tenant/info', (req, res) => {
+  tenants = carregarTenants();
+  const key = identificarTenantKey(req);
+  res.json(tenants[key] || tenants['default']);
+});
 
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -103,20 +130,26 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
 });
 
 app.post('/api/medico/cadastro', (req, res) => {
+  const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
   const { nome, cpf, email, crm, senha } = req.body;
+
   if (!nome || !cpf || !crm || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
   if (medicos.find(m => m.cpf === cpf)) return res.status(400).json({ error: 'CPF já cadastrado.' });
 
   const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
   medicos.push(novoMedico);
-  salvarMedicos(medicos);
+  salvarMedicos(key, medicos);
 
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação pela Secretaria de Saúde de Paracuru.' });
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
 });
 
 app.post('/api/medico/login', (req, res) => {
+  const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
   const { cpf, senha } = req.body;
+
   const medico = medicos.find(m => m.cpf === cpf && m.senha === senha);
   if (!medico) return res.status(401).json({ error: 'CPF ou Senha incorretos.' });
   if (medico.status === 'pendente') return res.status(403).json({ error: 'Cadastro pendente de aprovação.' });
@@ -135,9 +168,12 @@ app.post('/api/admin/login', (req, res) => {
 });
 
 app.get('/api/admin/dados', (req, res) => {
+  const key = identificarTenantKey(req);
+  const statsGeral = carregarStats(key);
   const dh = obterDataHoraBR();
+
   res.json({
-    medicos: obterMedicosComStatus(),
+    medicos: obterMedicosComStatus(key),
     logsConsultas,
     registroPacientesGeral,
     atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
@@ -148,12 +184,15 @@ app.get('/api/admin/dados', (req, res) => {
 });
 
 app.post('/api/admin/medico/status', (req, res) => {
+  const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
   const { medicoId, novoStatus } = req.body;
+
   const medico = medicos.find(m => m.id === medicoId);
   if (medico) {
     medico.status = novoStatus;
-    salvarMedicos(medicos);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    salvarMedicos(key, medicos);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
     res.json({ success: true });
   } else {
     res.status(404).json({ error: 'Médico não encontrado.' });
@@ -161,10 +200,13 @@ app.post('/api/admin/medico/status', (req, res) => {
 });
 
 app.post('/api/admin/medico/excluir', (req, res) => {
+  const key = identificarTenantKey(req);
+  let medicos = carregarMedicos(key);
   const { medicoId } = req.body;
+
   medicos = medicos.filter(m => m.id !== medicoId);
-  salvarMedicos(medicos);
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  salvarMedicos(key, medicos);
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
   res.json({ success: true });
 });
 
@@ -174,14 +216,15 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
   res.status(404).send('Arquivo não encontrado.');
 });
 
-function processarFinalizacaoConsulta(dados) {
+function processarFinalizacaoConsulta(dados, tenantKey) {
   try {
     const dh = obterDataHoraBR();
+    const stats = carregarStats(tenantKey);
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
-    statsGeral.historicoDiario[dh.data] = (statsGeral.historicoDiario[dh.data] || 0) + 1;
-    statsGeral.historicoMensal[dh.mesAno] = (statsGeral.historicoMensal[dh.mesAno] || 0) + 1;
-    salvarStats(statsGeral);
+    stats.historicoDiario[dh.data] = (stats.historicoDiario[dh.data] || 0) + 1;
+    stats.historicoMensal[dh.mesAno] = (stats.historicoMensal[dh.mesAno] || 0) + 1;
+    salvarStats(tenantKey, stats);
 
     const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
     const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
@@ -190,7 +233,8 @@ function processarFinalizacaoConsulta(dados) {
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    doc.fontSize(20).text('Relatório de Telemedicina - Prefeitura de Paracuru', { align: 'center' });
+    const tenantInfo = tenants[tenantKey] || tenants['default'];
+    doc.fontSize(20).text(`Relatório de Telemedicina - ${tenantInfo.nome}`, { align: 'center' });
     doc.moveDown();
     doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
     doc.text(`Médico: ${medico?.nome || 'Dr. Plantonista'} (CRM: ${medico?.crm || 'N/A'})`);
@@ -227,9 +271,9 @@ function processarFinalizacaoConsulta(dados) {
 
           io.emit('atualizar-admin-dashboard', {
             logsConsultas,
-            atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
-            atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
-            totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
+            atendimentosHoje: stats.historicoDiario[dh.data] || 0,
+            atendimentosMes: stats.historicoMensal[dh.mesAno] || 0,
+            totalGeralAcessos: stats.totalGeralAcessos || 0,
             registroPacientesGeral,
             filaAtualCount: filaPacientes.length
           });
@@ -241,20 +285,24 @@ function processarFinalizacaoConsulta(dados) {
 
 // WEBSOCKETS
 io.on('connection', (socket) => {
-  statsGeral.totalGeralAcessos += 1;
-  salvarStats(statsGeral);
+  const reqHost = socket.handshake.headers.host || '';
+  const tenantKey = reqHost.includes('paracuru') ? 'paracuru' : (reqHost.includes('palmacia') ? 'palmacia' : 'default');
+
+  const stats = carregarStats(tenantKey);
+  stats.totalGeralAcessos += 1;
+  salvarStats(tenantKey, stats);
 
   socket.emit('atualizar-fila', filaPacientes);
-  socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+  socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
 
   socket.on('medico-online', (medico) => {
     medicosOnline.set(socket.id, medico);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 
   socket.on('medico-offline', () => {
     medicosOnline.delete(socket.id);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 
   socket.on('entrar-fila', (dados) => {
@@ -281,6 +329,7 @@ io.on('connection', (socket) => {
     
     const sessionId = Date.now().toString();
     const dadosConsulta = {
+      tenantKey,
       sessionId,
       roomId,
       medicoSocketId: socket.id,
@@ -304,12 +353,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // WEBRTC SINALIZAÇÃO DIRETA
-  socket.on('entrar-sala-consulta', (data) => {
-    const { roomId } = data;
-    socket.join(roomId);
-  });
-
+  // SINALIZAÇÃO WEBRTC
   socket.on('paciente-pronto-para-oferta', (data) => {
     const { targetId } = data;
     if (targetId) {
@@ -341,7 +385,7 @@ io.on('connection', (socket) => {
 
     if (dados && dados.anamnese) consulta.anamnese = dados.anamnese;
 
-    processarFinalizacaoConsulta(consulta);
+    processarFinalizacaoConsulta(consulta, consulta.tenantKey || tenantKey);
 
     if (consulta.pacienteSocketId) io.to(consulta.pacienteSocketId).emit('consulta-encerrada');
     if (consulta.medicoSocketId) io.to(consulta.medicoSocketId).emit('consulta-encerrada');
@@ -356,7 +400,7 @@ io.on('connection', (socket) => {
 
     if (consultasAtivas.has(socket.id)) {
       const consulta = consultasAtivas.get(socket.id);
-      processarFinalizacaoConsulta(consulta);
+      processarFinalizacaoConsulta(consulta, consulta.tenantKey || tenantKey);
 
       const outroSocketId = socket.id === consulta.medicoSocketId ? consulta.pacienteSocketId : consulta.medicoSocketId;
       if (outroSocketId) io.to(outroSocketId).emit('consulta-encerrada');
@@ -366,9 +410,9 @@ io.on('connection', (socket) => {
     }
 
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
+    io.emit('atualizar-lista-medicos-geral', statusMedicos => statusMedicos);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Telemedicina Paracuru ativa na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Servidor MedGo Multi-Tenant ativo na porta ${PORT}`));
