@@ -18,7 +18,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-['uploads', 'logs', 'data'].forEach(dir => {
+// ISOLAMENTO DE BANCO DE DADOS POR MUNICÍPIO / TENANT (PARACURU)
+function getTenantPath(tenantId, fileName) {
+  const dir = path.join(__dirname, 'data', tenantId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, fileName);
+}
+
+['uploads', 'logs', 'data', path.join('data', 'paracuru')].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -28,20 +35,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-const FILE_MEDICOS = path.join(__dirname, 'data', 'medicos.json');
-const FILE_STATS = path.join(__dirname, 'data', 'estatisticas.json');
-const FILE_TENANTS = path.join(__dirname, 'data', 'tenants.json');
-
-function carregarTenants() {
-  if (!fs.existsSync(FILE_TENANTS)) {
-    const padrao = {
-      "default": { id: "paracuru", nome: "Prefeitura de Paracuru", subtitulo: "Secretaria Municipal de Saúde" }
-    };
-    fs.writeFileSync(FILE_TENANTS, JSON.stringify(padrao, null, 2));
-    return padrao;
-  }
-  try { return JSON.parse(fs.readFileSync(FILE_TENANTS, 'utf8')); } catch (err) { return {}; }
-}
+const FILE_MEDICOS = getTenantPath('paracuru', 'medicos.json');
+const FILE_STATS = getTenantPath('paracuru', 'estatisticas.json');
 
 function carregarMedicos() {
   if (!fs.existsSync(FILE_MEDICOS)) {
@@ -68,7 +63,6 @@ function salvarStats(stats) {
   try { fs.writeFileSync(FILE_STATS, JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
 }
 
-let tenants = carregarTenants();
 let medicos = carregarMedicos();
 let statsGeral = carregarStats();
 let filaPacientes = [];
@@ -100,12 +94,8 @@ function obterMedicosComStatus() {
   }));
 }
 
-// ENDPOINTS
-app.get('/api/tenant/info', (req, res) => {
-  const host = req.headers.host || '';
-  const tenantKey = Object.keys(tenants).find(k => host.includes(k)) || 'default';
-  res.json(tenants[tenantKey] || tenants['default']);
-});
+// ROTA DE SUBLINK/SUBDOMÍNIO PARA PARACURU
+app.use('/paracuru', express.static(path.join(__dirname, 'public')));
 
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -122,7 +112,7 @@ app.post('/api/medico/cadastro', (req, res) => {
   salvarMedicos(medicos);
 
   io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação pela Secretaria de Saúde.' });
+  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação pela Secretaria de Saúde de Paracuru.' });
 });
 
 app.post('/api/medico/login', (req, res) => {
@@ -200,10 +190,10 @@ function processarFinalizacaoConsulta(dados) {
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    doc.fontSize(20).text('MedGo - Relatório de Telemedicina (Paracuru)', { align: 'center' });
+    doc.fontSize(20).text('Relatório de Telemedicina - Prefeitura de Paracuru', { align: 'center' });
     doc.moveDown();
     doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
-    doc.text(`Médico: ${medico?.nome || 'Dr. MedGo'} (CRM: ${medico?.crm || 'N/A'})`);
+    doc.text(`Médico: ${medico?.nome || 'Dr. Plantonista'} (CRM: ${medico?.crm || 'N/A'})`);
     doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/A'}`);
     doc.text(`Consentimento LGPD: Aceito em ${paciente?.dataHoraConsentimento || dh.dataHoraCompleta}`);
     doc.moveDown();
@@ -230,7 +220,7 @@ function processarFinalizacaoConsulta(dados) {
           logsConsultas.push({
             sessionId,
             paciente: paciente?.nome || 'Paciente',
-            medico: medico?.nome || 'Dr. MedGo',
+            medico: medico?.nome || 'Dr. Plantonista',
             data: dh.dataHoraCompleta,
             zipUrl: `/api/admin/download-log/${sessionId}`
           });
@@ -295,7 +285,7 @@ io.on('connection', (socket) => {
       roomId,
       medicoSocketId: socket.id,
       pacienteSocketId,
-      medico: medicoInfo || { nome: 'Médico MedGo', crm: 'N/A' },
+      medico: medicoInfo || { nome: 'Médico Plantonista', crm: 'N/A' },
       paciente: paciente || { nome: 'Paciente', cpf: '000.000.000-00' },
       anamnese: '',
       arquivosTrocados: []
@@ -314,7 +304,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // WEBRTC SINALIZAÇÃO
+  // WEBRTC SINALIZAÇÃO DIRETA
   socket.on('entrar-sala-consulta', (data) => {
     const { roomId } = data;
     socket.join(roomId);
@@ -381,4 +371,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 MedGo Paracuru ativo na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Telemedicina Paracuru ativa na porta ${PORT}`));

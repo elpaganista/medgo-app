@@ -4,13 +4,17 @@
     "nome": "Prefeitura de Paracuru",
     "subtitulo": "Secretaria Municipal de Saúde",
     "logo": "/images/paracuru-logo.png",
-    "corPrimaria": "#0284c7"
+    "corPrimaria": "#2B6CB0",
+    "corSecundaria": "#2F855A",
+    "corDestaque": "#D69E2E"
   },
   "paracuru": {
     "id": "paracuru",
     "nome": "Prefeitura de Paracuru",
     "subtitulo": "Secretaria Municipal de Saúde",
     "logo": "/images/paracuru-logo.png",
-    "corPrimaria": "#0284c7"
+    "corPrimaria": "#2B6CB0",
+    "corSecundaria": "#2F855A",
+    "corDestaque": "#D69E2E"
   }
 }
