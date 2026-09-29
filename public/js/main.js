@@ -8,8 +8,45 @@ let medSessaoAtiva = null;
 let currentRoomId = null;
 let pendingCandidates = [];
 
-// Configuração WebRTC: STUN do Google + TURN público (openrelay) para
-// atravessar CGNAT/NAT simétrico quando STUN sozinho não é suficiente.
+// MODAL E GERENCIAMENTO LGPD
+function abrirModalPrivacidade() {
+  document.getElementById('modal-privacidade').classList.remove('hidden');
+}
+
+function fecharModalPrivacidade() {
+  document.getElementById('modal-privacidade').classList.add('hidden');
+}
+
+// GERENCIAMENTO DE TEMA CLARO/ESCURO
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme');
+  const icon = document.getElementById('theme-icon');
+  
+  if (savedTheme === 'light') {
+    document.documentElement.classList.remove('dark');
+    if (icon) icon.className = "fa-solid fa-sun text-amber-500";
+  } else {
+    document.documentElement.classList.add('dark');
+    if (icon) icon.className = "fa-solid fa-moon text-slate-200";
+  }
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  const icon = document.getElementById('theme-icon');
+  
+  if (isDark) {
+    localStorage.setItem('theme', 'dark');
+    if (icon) icon.className = "fa-solid fa-moon text-slate-200";
+  } else {
+    localStorage.setItem('theme', 'light');
+    if (icon) icon.className = "fa-solid fa-sun text-amber-500";
+  }
+}
+
+initTheme();
+
+// CONFIGURAÇÃO WEBRTC: STUN + TURN
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -35,8 +72,8 @@ function switchTab(tabName) {
     const btn = document.getElementById(`nav-btn-${name}`);
     if (btn) {
       btn.className = (name === tabName)
-        ? "px-4 py-2 rounded-lg text-sm font-medium transition-all bg-slate-800 text-white flex items-center gap-2"
-        : "px-4 py-2 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white hover:bg-slate-800/50 flex items-center gap-2";
+        ? "px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white flex items-center gap-2"
+        : "px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 flex items-center gap-2";
     }
   });
 }
@@ -85,7 +122,7 @@ async function aplicarCandidatosPendentes() {
   }
 }
 
-// INICIALIZA A CONEXÃO WEBRTC NATIVA VIA SOCKET.IO
+// INICIALIZA CONEXÃO WEBRTC
 async function iniciarWebRTCNativo(roomId, isDoctor) {
   if (rtcPeer) {
     try { rtcPeer.close(); } catch(e){}
@@ -126,14 +163,11 @@ async function iniciarWebRTCNativo(roomId, isDoctor) {
     }
   };
 
-  // Se for o paciente, avisa DIRETAMENTE o médico (pelo socket id, sem
-  // depender de sala/timing) que já está pronto para receber a Oferta.
   if (!isDoctor && targetSocketId) {
     socket.emit('paciente-pronto-para-oferta', { targetId: targetSocketId });
   }
 }
 
-// Quando o paciente avisa que está pronto, o Médico gera a Oferta
 socket.on('iniciar-criacao-oferta', async (data) => {
   if (data.pacienteSocketId) {
     targetSocketId = data.pacienteSocketId;
@@ -187,15 +221,15 @@ const formCadastroMedico = document.getElementById('form-cadastro-medico');
 
 if (btnMedLoginView && btnMedCadView) {
   btnMedLoginView.addEventListener('click', () => {
-    btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400";
-    btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-white";
+    btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-500 dark:border-cyan-400";
+    btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-slate-800 dark:hover:text-white";
     formLoginMedico.classList.remove('hidden');
     formCadastroMedico.classList.add('hidden');
   });
 
   btnMedCadView.addEventListener('click', () => {
-    btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400";
-    btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-white";
+    btnMedCadView.className = "flex-1 py-2 text-sm font-semibold text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-500 dark:border-cyan-400";
+    btnMedLoginView.className = "flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-slate-800 dark:hover:text-white";
     formCadastroMedico.classList.remove('hidden');
     formLoginMedico.classList.add('hidden');
   });
@@ -265,12 +299,12 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
     containerPaciente.innerHTML = aprovados.length === 0 
       ? '<p class="text-xs text-slate-400">Nenhum médico disponível no momento.</p>'
       : aprovados.map(m => `
-        <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+        <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs">
           <div>
-            <strong class="text-slate-200">Dr(a). ${m.nome}</strong><br>
-            <span class="text-slate-400">CRM: ${m.crm}</span>
+            <strong class="text-slate-800 dark:text-slate-200">Dr(a). ${m.nome}</strong><br>
+            <span class="text-slate-500 dark:text-slate-400">CRM: ${m.crm}</span>
           </div>
-          <span class="w-2.5 h-2.5 rounded-full ${m.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}" title="${m.isOnline ? 'Online' : 'Offline'}"></span>
+          <span class="w-2.5 h-2.5 rounded-full ${m.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400 dark:bg-slate-600'}" title="${m.isOnline ? 'Online' : 'Offline'}"></span>
         </div>
       `).join('');
   }
@@ -278,17 +312,26 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   renderMedicosAdmin(listaMedicos);
 });
 
-// FILA PACIENTE
+// FILA PACIENTE LGPD VALIDADO
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
     e.preventDefault();
+
+    const lgpdConsent = document.getElementById('pac-lgpd-consent');
+    if (!lgpdConsent || !lgpdConsent.checked) {
+      alert('Você precisa aceitar os Termos de Privacidade e Proteção de Dados (LGPD) para prosseguir.');
+      return;
+    }
+
     const dados = {
       nome: document.getElementById('pac-nome').value,
       cpf: document.getElementById('pac-cpf').value,
       endereco: document.getElementById('pac-endereco').value,
       telefone: document.getElementById('pac-telefone').value,
       email: document.getElementById('pac-email').value,
+      lgpdAceito: true,
+      dataHoraConsentimento: new Date().toISOString()
     };
     
     socket.emit('entrar-fila', dados);
@@ -307,9 +350,9 @@ socket.on('atualizar-fila', (fila) => {
 
   fila.forEach((p, idx) => {
     const li = document.createElement('li');
-    li.className = "flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs";
+    li.className = "flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs";
     li.innerHTML = `
-      <div><strong class="text-white">${idx + 1}. ${p.nome}</strong> <span class="text-slate-400">(CPF: ${p.cpf})</span></div>
+      <div><strong class="text-slate-900 dark:text-white">${idx + 1}. ${p.nome}</strong> <span class="text-slate-500 dark:text-slate-400">(CPF: ${p.cpf})</span></div>
       <button class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold transition" onclick="chamarPaciente('${p.id}', '${p.nome}', '${p.cpf}')">Chamar</button>
     `;
     lista.appendChild(li);
@@ -467,9 +510,9 @@ function renderMedicosAdmin(medicos) {
   }
 
   container.innerHTML = medicos.map(m => `
-    <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+    <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs">
       <div>
-        <strong class="text-white">${m.nome}</strong> <span class="text-slate-400">(CRM: ${m.crm})</span> - Status: <em class="text-cyan-400 font-bold">${m.statusCadastro.toUpperCase()}</em>
+        <strong class="text-slate-800 dark:text-white">${m.nome}</strong> <span class="text-slate-500 dark:text-slate-400">(CRM: ${m.crm})</span> - Status: <em class="text-cyan-600 dark:text-cyan-400 font-bold">${m.statusCadastro.toUpperCase()}</em>
       </div>
       <div class="flex gap-2">
         ${m.statusCadastro === 'pendente' ? `
@@ -498,9 +541,9 @@ function renderLogsAdmin(logs) {
   }
 
   lista.innerHTML = logs.map(l => `
-    <li class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-      <span><strong class="text-white">${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
-      <a href="${l.zipUrl}" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg">📦 Baixar .ZIP</a>
+    <li class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs">
+      <span><strong class="text-slate-800 dark:text-white">${l.paciente}</strong> atendido por <em>${l.medico}</em> (${l.data})</span>
+      <a href="${l.zipUrl}" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg">📦 Baixar .ZIP</a>
     </li>
   `).join('');
 }
@@ -559,9 +602,9 @@ function adicionarArquivoNaLista(file) {
   if (emptyMsg) emptyMsg.remove();
 
   const div = document.createElement('div');
-  div.className = "flex items-center justify-between p-2 bg-slate-900 border border-slate-800 rounded-lg text-xs";
+  div.className = "flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs";
   div.innerHTML = `
-    <span class="text-slate-200">📄 <strong>${file.originalname}</strong></span>
+    <span class="text-slate-800 dark:text-slate-200">📄 <strong>${file.originalname}</strong></span>
     <a href="${file.path}" target="_blank" download class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-[10px] font-semibold">Baixar</a>
   `;
   container.appendChild(div);

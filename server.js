@@ -30,6 +30,18 @@ const upload = multer({ storage });
 
 const FILE_MEDICOS = path.join(__dirname, 'data', 'medicos.json');
 const FILE_STATS = path.join(__dirname, 'data', 'estatisticas.json');
+const FILE_TENANTS = path.join(__dirname, 'data', 'tenants.json');
+
+function carregarTenants() {
+  if (!fs.existsSync(FILE_TENANTS)) {
+    const padrao = {
+      "default": { id: "paracuru", nome: "Prefeitura de Paracuru", subtitulo: "Secretaria Municipal de Saúde" }
+    };
+    fs.writeFileSync(FILE_TENANTS, JSON.stringify(padrao, null, 2));
+    return padrao;
+  }
+  try { return JSON.parse(fs.readFileSync(FILE_TENANTS, 'utf8')); } catch (err) { return {}; }
+}
 
 function carregarMedicos() {
   if (!fs.existsSync(FILE_MEDICOS)) {
@@ -56,6 +68,7 @@ function salvarStats(stats) {
   try { fs.writeFileSync(FILE_STATS, JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
 }
 
+let tenants = carregarTenants();
 let medicos = carregarMedicos();
 let statsGeral = carregarStats();
 let filaPacientes = [];
@@ -87,7 +100,13 @@ function obterMedicosComStatus() {
   }));
 }
 
-// API Endpoints
+// ENDPOINTS
+app.get('/api/tenant/info', (req, res) => {
+  const host = req.headers.host || '';
+  const tenantKey = Object.keys(tenants).find(k => host.includes(k)) || 'default';
+  res.json(tenants[tenantKey] || tenants['default']);
+});
+
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
   res.json({ filename: req.file.filename, originalname: req.file.originalname, path: `/uploads/${req.file.filename}` });
@@ -103,7 +122,7 @@ app.post('/api/medico/cadastro', (req, res) => {
   salvarMedicos(medicos);
 
   io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus());
-  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
+  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação pela Secretaria de Saúde.' });
 });
 
 app.post('/api/medico/login', (req, res) => {
@@ -181,11 +200,12 @@ function processarFinalizacaoConsulta(dados) {
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    doc.fontSize(20).text('MedGo - Relatório de Telemedicina', { align: 'center' });
+    doc.fontSize(20).text('MedGo - Relatório de Telemedicina (Paracuru)', { align: 'center' });
     doc.moveDown();
     doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
     doc.text(`Médico: ${medico?.nome || 'Dr. MedGo'} (CRM: ${medico?.crm || 'N/A'})`);
     doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/A'}`);
+    doc.text(`Consentimento LGPD: Aceito em ${paciente?.dataHoraConsentimento || dh.dataHoraCompleta}`);
     doc.moveDown();
     doc.fontSize(14).text('Ficha Clínico-Anamnese:');
     doc.fontSize(11).text(anamnese || 'Consulta encerrada.');
@@ -229,7 +249,7 @@ function processarFinalizacaoConsulta(dados) {
   } catch (err) { console.error('Erro geral ao finalizar:', err); }
 }
 
-// WebSockets
+// WEBSOCKETS
 io.on('connection', (socket) => {
   statsGeral.totalGeralAcessos += 1;
   salvarStats(statsGeral);
@@ -249,7 +269,13 @@ io.on('connection', (socket) => {
 
   socket.on('entrar-fila', (dados) => {
     const dh = obterDataHoraBR();
-    const paciente = { id: socket.id, ...dados, horaEntrada: dh.hora, status: 'Em Espera' };
+    const paciente = { 
+      id: socket.id, 
+      ...dados, 
+      horaEntrada: dh.hora, 
+      status: 'Em Espera',
+      ipConsentimento: socket.handshake.address 
+    };
     filaPacientes.push(paciente);
     registroPacientesGeral.push(paciente);
     
@@ -288,7 +314,12 @@ io.on('connection', (socket) => {
     });
   });
 
-  // SINALIZAÇÃO WEBRTC — sempre ponto-a-ponto via socket id (sem salas/timing)
+  // WEBRTC SINALIZAÇÃO
+  socket.on('entrar-sala-consulta', (data) => {
+    const { roomId } = data;
+    socket.join(roomId);
+  });
+
   socket.on('paciente-pronto-para-oferta', (data) => {
     const { targetId } = data;
     if (targetId) {
@@ -350,4 +381,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 MedGo ativo na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 MedGo Paracuru ativo na porta ${PORT}`));

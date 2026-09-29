@@ -1,0 +1,16 @@
+{
+  "default": {
+    "id": "paracuru",
+    "nome": "Prefeitura de Paracuru",
+    "subtitulo": "Secretaria Municipal de Saúde",
+    "logo": "/images/paracuru-logo.png",
+    "corPrimaria": "#0284c7"
+  },
+  "paracuru": {
+    "id": "paracuru",
+    "nome": "Prefeitura de Paracuru",
+    "subtitulo": "Secretaria Municipal de Saúde",
+    "logo": "/images/paracuru-logo.png",
+    "corPrimaria": "#0284c7"
+  }
+}
