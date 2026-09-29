@@ -54,7 +54,7 @@ async function carregarMarcaTenant() {
       }
     }
   } catch (err) {
-    console.warn('Usando marca padrão MedGo:', err);
+    console.warn('Usando marca padrão:', err);
   }
 }
 
@@ -176,7 +176,7 @@ async function aplicarCandidatosPendentes() {
   }
 }
 
-// 5. INICIALIZA A CONEXÃO WEBRTC
+// 5. INICIALIZA CONEXÃO WEBRTC
 async function iniciarWebRTCNativo(roomId, isDoctor) {
   if (rtcPeer) {
     try { rtcPeer.close(); } catch(e){}
