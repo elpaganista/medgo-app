@@ -24,9 +24,27 @@ const FILE_TENANTS = path.join(__dirname, 'data', 'tenants.json');
 function carregarTenants() {
   if (!fs.existsSync(FILE_TENANTS)) {
     const padrao = {
-      "default": { id: "medgo", nome: "MedGo Telemedicina", subtitulo: "Plataforma de Saúde Digital", badge: "TELEMEDICINA" },
-      "paracuru": { id: "paracuru", nome: "Prefeitura de Paracuru", subtitulo: "Secretaria Municipal de Saúde", badge: "PARACURU", logo: "/images/paracuru-logo.png" },
-      "palmacia": { id: "palmacia", nome: "Prefeitura de Palmácia", subtitulo: "Secretaria Municipal de Saúde", badge: "PALMÁCIA", logo: "/images/palmacia-logo.png" }
+      "default": { 
+        id: "medgo", 
+        nome: "MedGo Telemedicina", 
+        subtitulo: "Plataforma de Saúde Digital", 
+        badge: "TELEMEDICINA", 
+        logo: "/images/medgo-logo.png" 
+      },
+      "paracuru": { 
+        id: "paracuru", 
+        nome: "Prefeitura de Paracuru", 
+        subtitulo: "Secretaria Municipal de Saúde", 
+        badge: "PARACURU", 
+        logo: "/images/paracuru-logo.png" 
+      },
+      "palmacia": { 
+        id: "palmacia", 
+        nome: "Prefeitura de Palmácia", 
+        subtitulo: "Secretaria Municipal de Saúde", 
+        badge: "PALMÁCIA", 
+        logo: "/images/palmacia-logo.png" 
+      }
     };
     if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
     fs.writeFileSync(FILE_TENANTS, JSON.stringify(padrao, null, 2));
@@ -181,6 +199,13 @@ app.get('/api/admin/dados', (req, res) => {
     totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
     filaAtualCount: filaPacientes.length
   });
+});
+
+app.post('/api/admin/zerar-stats', (req, res) => {
+  const key = identificarTenantKey(req);
+  const statsVazias = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
+  salvarStats(key, statsVazias);
+  res.json({ success: true, message: 'Estatísticas zeradas com sucesso!' });
 });
 
 app.post('/api/admin/medico/status', (req, res) => {

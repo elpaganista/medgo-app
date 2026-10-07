@@ -7,6 +7,7 @@ let currentConsultation = null;
 let medSessaoAtiva = null;
 let currentRoomId = null;
 let pendingCandidates = [];
+let chamadaPendenteDados = null;
 
 // 1. CARREGA A MARCA DO MUNICÍPIO DINAMICAMENTE (MULTI-TENANT)
 async function carregarMarcaTenant() {
@@ -366,7 +367,7 @@ socket.on('atualizar-lista-medicos-geral', (listaMedicos) => {
   renderMedicosAdmin(listaMedicos);
 });
 
-// 7. FILA PACIENTE (LGPD VALIDADO)
+// 7. FILA PACIENTES & MODAL ATENDIMENTO MOBILE
 const formPac = document.getElementById('form-paciente');
 if (formPac) {
   formPac.addEventListener('submit', (e) => {
@@ -425,16 +426,44 @@ window.chamarPaciente = async (pacienteSocketId, nome, cpf) => {
   iniciarWebRTCNativo(roomId, true);
 };
 
-socket.on('chamado-para-consulta', async (dados) => {
-  targetSocketId = dados.medicoSocketId || dados.sender;
-  const roomId = dados.roomId || `room-${Date.now()}`;
+// RECEBE CHAMADA DO MÉDICO NO CELULAR / BROWSER
+socket.on('chamado-para-consulta', (dados) => {
+  chamadaPendenteDados = dados;
+  
+  const modalChamada = document.getElementById('modal-chamada-recebida');
+  const medicoNomeTxt = document.getElementById('modal-chamada-medico-nome');
+  
+  if (medicoNomeTxt && dados.medicoInfo) {
+    medicoNomeTxt.innerText = `Dr(a). ${dados.medicoInfo.nome} chamou para a consulta.`;
+  }
+  
+  if (modalChamada) {
+    modalChamada.classList.remove('hidden');
+  } else {
+    atenderChamadaMobile();
+  }
+});
 
-  alert('O médico chamou para a consulta!');
+const btnAceitarChamada = document.getElementById('btn-aceitar-chamada-mobile');
+if (btnAceitarChamada) {
+  btnAceitarChamada.addEventListener('click', async () => {
+    const modalChamada = document.getElementById('modal-chamada-recebida');
+    if (modalChamada) modalChamada.classList.add('hidden');
+    await atenderChamadaMobile();
+  });
+}
+
+async function atenderChamadaMobile() {
+  if (!chamadaPendenteDados) return;
+
+  targetSocketId = chamadaPendenteDados.medicoSocketId || chamadaPendenteDados.sender;
+  const roomId = chamadaPendenteDados.roomId || `room-${Date.now()}`;
+
   configurarInterfaceConsulta(false);
 
   await obterMidiaLocal();
   iniciarWebRTCNativo(roomId, false);
-});
+}
 
 function configurarInterfaceConsulta(isDoctor) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -498,7 +527,7 @@ function toggleCam() {
   }
 }
 
-// 8. ADMIN DASHBOARD
+// 8. ADMIN DASHBOARD & ZERAR ESTATÍSTICAS
 const formAdmin = document.getElementById('form-login-admin');
 if (formAdmin) {
   formAdmin.addEventListener('submit', async (e) => {
@@ -553,6 +582,19 @@ function renderAdminDashboard(data) {
 socket.on('atualizar-admin-dashboard', (data) => {
   renderAdminDashboard(data);
 });
+
+// FUNÇÃO PARA ZERAR AS ESTATÍSTICAS DO PAINEL
+window.zerarEstatisticasAdmin = async () => {
+  if (!confirm('Deseja realmente zerar todos os contadores de acessos e atendimentos deste município?')) return;
+  
+  const res = await fetch('/api/admin/zerar-stats', { method: 'POST' });
+  if (res.ok) {
+    alert('Estatísticas zeradas com sucesso!');
+    carregarDadosAdmin();
+  } else {
+    alert('Erro ao zerar estatísticas.');
+  }
+};
 
 function renderMedicosAdmin(medicos) {
   const container = document.getElementById('lista-medicos-admin');
