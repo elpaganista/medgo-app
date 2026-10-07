@@ -91,9 +91,17 @@ function salvarMedicos(tenantId, lista) {
   try { fs.writeFileSync(getTenantPath(tenantId, 'medicos.json'), JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
 }
 
+// CONTADOR AVANÇADO DE ESTATÍSTICAS
 function carregarStats(tenantId) {
   const file = getTenantPath(tenantId, 'estatisticas.json');
-  const padrao = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
+  const padrao = { 
+    totalGeralAcessos: 0, 
+    perfis: { medicos: 0, pacientes: 0, geral: 0 },
+    historicoDiario: {}, 
+    historicoSemanal: {},
+    historicoMensal: {},
+    historicoAnual: {}
+  };
   if (!fs.existsSync(file)) {
     fs.writeFileSync(file, JSON.stringify(padrao, null, 2));
     return padrao;
@@ -103,6 +111,35 @@ function carregarStats(tenantId) {
 
 function salvarStats(tenantId, stats) {
   try { fs.writeFileSync(getTenantPath(tenantId, 'estatisticas.json'), JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
+}
+
+function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
+  const stats = carregarStats(tenantKey);
+  const agora = new Date();
+  
+  const dataHoje = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
+  const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
+  const anoAtual = `${agora.getFullYear()}`;
+  
+  const inicioAno = new Date(agora.getFullYear(), 0, 1);
+  const dias = Math.floor((agora - inicioAno) / (24 * 60 * 60 * 1000));
+  const semanaAtual = `Semana ${Math.ceil((dias + inicioAno.getDay() + 1) / 7)} - ${anoAtual}`;
+
+  if (!stats.perfis) stats.perfis = { medicos: 0, pacientes: 0, geral: 0 };
+  if (!stats.historicoDiario) stats.historicoDiario = {};
+  if (!stats.historicoSemanal) stats.historicoSemanal = {};
+  if (!stats.historicoMensal) stats.historicoMensal = {};
+  if (!stats.historicoAnual) stats.historicoAnual = {};
+
+  stats.totalGeralAcessos = (stats.totalGeralAcessos || 0) + 1;
+  stats.perfis[tipoPerfil] = (stats.perfis[tipoPerfil] || 0) + 1;
+
+  stats.historicoDiario[dataHoje] = (stats.historicoDiario[dataHoje] || 0) + 1;
+  stats.historicoSemanal[semanaAtual] = (stats.historicoSemanal[semanaAtual] || 0) + 1;
+  stats.historicoMensal[mesAno] = (stats.historicoMensal[mesAno] || 0) + 1;
+  stats.historicoAnual[anoAtual] = (stats.historicoAnual[anoAtual] || 0) + 1;
+
+  salvarStats(tenantKey, stats);
 }
 
 let filaPacientes = [];
@@ -117,7 +154,8 @@ function obterDataHoraBR() {
     data: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }),
     hora: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza' }),
     dataHoraCompleta: agora.toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }),
-    mesAno: `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`
+    mesAno: `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`,
+    ano: `${agora.getFullYear()}`
   };
 }
 
@@ -173,6 +211,8 @@ app.post('/api/medico/login', (req, res) => {
   if (medico.status === 'pendente') return res.status(403).json({ error: 'Cadastro pendente de aprovação.' });
   if (medico.status === 'bloqueado') return res.status(403).json({ error: 'Conta médica bloqueada.' });
 
+  registrarAcessoAvancado(key, 'medicos');
+
   res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
 
@@ -194,18 +234,28 @@ app.get('/api/admin/dados', (req, res) => {
     medicos: obterMedicosComStatus(key),
     logsConsultas,
     registroPacientesGeral,
+    perfis: statsGeral.perfis || { medicos: 0, pacientes: 0, geral: 0 },
     atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
     atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
+    atendimentosAno: statsGeral.historicoAnual[dh.ano] || 0,
     totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
     filaAtualCount: filaPacientes.length
   });
 });
 
+// ROTA PARA ZERAR TODOS OS CONTADORES
 app.post('/api/admin/zerar-stats', (req, res) => {
   const key = identificarTenantKey(req);
-  const statsVazias = { totalGeralAcessos: 0, historicoDiario: {}, historicoMensal: {} };
-  salvarStats(key, statsVazias);
-  res.json({ success: true, message: 'Estatísticas zeradas com sucesso!' });
+  const statsZeradas = {
+    totalGeralAcessos: 0,
+    perfis: { medicos: 0, pacientes: 0, geral: 0 },
+    historicoDiario: {},
+    historicoSemanal: {},
+    historicoMensal: {},
+    historicoAnual: {}
+  };
+  salvarStats(key, statsZeradas);
+  res.json({ success: true, message: 'Contadores zerados com sucesso para o cliente!' });
 });
 
 app.post('/api/admin/medico/status', (req, res) => {
@@ -249,6 +299,7 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
 
     stats.historicoDiario[dh.data] = (stats.historicoDiario[dh.data] || 0) + 1;
     stats.historicoMensal[dh.mesAno] = (stats.historicoMensal[dh.mesAno] || 0) + 1;
+    stats.historicoAnual[dh.ano] = (stats.historicoAnual[dh.ano] || 0) + 1;
     salvarStats(tenantKey, stats);
 
     const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
@@ -296,8 +347,10 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
 
           io.emit('atualizar-admin-dashboard', {
             logsConsultas,
+            perfis: stats.perfis,
             atendimentosHoje: stats.historicoDiario[dh.data] || 0,
             atendimentosMes: stats.historicoMensal[dh.mesAno] || 0,
+            atendimentosAno: stats.historicoAnual[dh.ano] || 0,
             totalGeralAcessos: stats.totalGeralAcessos || 0,
             registroPacientesGeral,
             filaAtualCount: filaPacientes.length
@@ -313,9 +366,7 @@ io.on('connection', (socket) => {
   const reqHost = socket.handshake.headers.host || '';
   const tenantKey = reqHost.includes('paracuru') ? 'paracuru' : (reqHost.includes('palmacia') ? 'palmacia' : 'default');
 
-  const stats = carregarStats(tenantKey);
-  stats.totalGeralAcessos += 1;
-  salvarStats(tenantKey, stats);
+  registrarAcessoAvancado(tenantKey, 'geral');
 
   socket.emit('atualizar-fila', filaPacientes);
   socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
@@ -331,6 +382,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('entrar-fila', (dados) => {
+    registrarAcessoAvancado(tenantKey, 'pacientes');
+    
     const dh = obterDataHoraBR();
     const paciente = { 
       id: socket.id, 
