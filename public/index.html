@@ -1,359 +1,335 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title id="page-title">Telemedicina</title>
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MedGo - Telemedicina</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              dark: '#0b1320',
-              panel: '#111c2e',
-              card: '#18263e',
-              accent: '#06b6d4'
-            }
-          },
-          fontFamily: { sans: ['Inter', 'sans-serif'] }
-        }
-      }
-    }
-  </script>
+  <style>
+    .bg-blur { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    /* Prevenir seleção de texto e ajustar toque em mobile */
+    video { object-fit: cover; }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col bg-slate-100 dark:bg-brand-dark text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
 
-  <!-- CABEÇALHO MULTI-TENANT -->
-  <header class="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-brand-panel/95 backdrop-blur sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-24">
-        
-        <!-- BRANDING DINÂMICO (LOGO AUMENTADA PARA h-16 / h-20) -->
-        <div class="flex items-center space-x-4 cursor-pointer" onclick="switchTab('paciente')">
-          <div id="tenant-logo-container" class="flex items-center gap-3">
-            <img id="tenant-logo" src="/images/paracuru-logo.png" alt="Logo Oficial" class="h-16 sm:h-20 w-auto object-contain transition-all">
-            <span id="tenant-title-text" class="text-xl font-bold tracking-tight text-slate-900 dark:text-white hidden"></span>
-          </div>
-          <div class="border-l border-slate-300 dark:border-slate-700 pl-3">
-            <span id="tenant-subtitulo" class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">TELEMEDICINA</span>
-            <span id="tenant-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 font-bold">SAÚDE DIGITAL</span>
-          </div>
+  <!-- HEADER / BRANDING DINÂMICO -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img id="tenant-logo" src="/images/medgo-logo.png" alt="Logo" class="h-10 w-auto object-contain">
+        <div>
+          <h1 id="tenant-nome" class="font-bold text-lg leading-tight text-white">MedGo Telemedicina</h1>
+          <p id="tenant-subtitulo" class="text-xs text-slate-400">Plataforma de Saúde Digital</p>
         </div>
-
-        <div class="flex items-center space-x-3">
-          <nav class="flex space-x-2">
-            <button id="nav-btn-paciente" class="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white flex items-center gap-2" onclick="switchTab('paciente')">
-              <i class="fa-solid fa-hospital-user text-emerald-500 dark:text-emerald-400"></i> Área do Paciente
-            </button>
-            <button id="nav-btn-medico" class="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 flex items-center gap-2" onclick="switchTab('medico')">
-              <i class="fa-solid fa-user-doctor text-cyan-500 dark:text-cyan-400"></i> Área Médica
-            </button>
-            <button id="nav-btn-admin" class="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 flex items-center gap-2" onclick="switchTab('admin')">
-              <i class="fa-solid fa-user-gear text-amber-500 dark:text-amber-400"></i> Gestão
-            </button>
-          </nav>
-
-          <button id="btn-theme-toggle" onclick="toggleTheme()" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Alternar tema">
-            <i id="theme-icon" class="fa-solid fa-moon"></i>
-          </button>
-        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="tenant-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">TELEMEDICINA</span>
+        <button id="btn-admin-access" onclick="abrirModalAdmin()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded transition">
+          <i class="fa-solid fa-lock"></i>
+        </button>
       </div>
     </div>
   </header>
 
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-
-    <!-- 1. ABA PACIENTE -->
-    <section id="tab-paciente" class="tab-content block space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm dark:shadow-none">
-          <h3 class="text-md font-semibold text-cyan-600 dark:text-cyan-400 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-stethoscope"></i> Corpo Médico Online
-          </h3>
-          <div id="lista-medicos-status-paciente" class="space-y-3">
-            <p class="text-xs text-slate-400">Carregando médicos...</p>
-          </div>
-        </div>
-
-        <div class="lg:col-span-2 bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm dark:shadow-none" id="form-paciente-box">
-          <h2 id="tenant-nome-header" class="text-xl font-bold text-slate-900 dark:text-white mb-1">Atendimento de Telemedicina</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mb-6">Preencha seus dados para entrar na fila de consulta da rede municipal de saúde</p>
-
-          <form id="form-paciente" class="space-y-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
-              <input type="text" id="pac-nome" placeholder="Ex: João da Silva" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">CPF</label>
-                <input type="text" id="pac-cpf" placeholder="000.000.000-00" maxlength="14" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone / WhatsApp</label>
-                <input type="tel" id="pac-telefone" placeholder="(00) 90000-0000" maxlength="15" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Endereço / Bairro</label>
-              <input type="text" id="pac-endereco" placeholder="Rua, Número, Bairro" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">E-mail</label>
-              <input type="email" id="pac-email" placeholder="seu@email.com" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-            </div>
-
-            <!-- CHECKBOX LGPD -->
-            <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-              <div class="flex items-start gap-2">
-                <input type="checkbox" id="pac-lgpd-consent" required class="mt-1 rounded border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-cyan-600 focus:ring-cyan-500">
-                <label for="pac-lgpd-consent" class="text-xs text-slate-600 dark:text-slate-400">
-                  Li e concordo com os <button type="button" onclick="abrirModalPrivacidade()" class="text-cyan-600 dark:text-cyan-400 underline hover:text-cyan-500">Termos de Privacidade e Proteção de Dados</button> conforme a LGPD (Lei 13.709/2018).
-                </label>
-              </div>
-            </div>
-
-            <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm transition shadow-md shadow-emerald-700/20">
-              Entrar na Sala de Espera Virtual
-            </button>
-          </form>
-        </div>
-
-        <div id="lobby-paciente" class="hidden lg:col-span-2 bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 p-8 rounded-2xl text-center space-y-4 shadow-sm dark:shadow-none">
-          <div class="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center text-3xl mx-auto animate-pulse">
-            <i class="fa-solid fa-clock"></i>
-          </div>
-          <h2 id="tenant-lobby-header" class="text-2xl font-bold text-slate-900 dark:text-white">Sala de Espera Virtual</h2>
-          <p class="text-sm text-slate-500 dark:text-slate-400">Sua solicitação foi recebida. Mantenha esta aba aberta, o médico iniciará a chamada em instantes...</p>
-        </div>
+  <!-- CONTEÚDO PRINCIPAL (TELAS A/B/C) -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col">
+    
+    <!-- TELA 1: SELEÇÃO DE PERFIL (PACIENTE / MÉDICO) -->
+    <div id="screen-landing" class="flex-1 flex flex-col justify-center items-center py-8">
+      <div class="text-center max-w-lg mb-8">
+        <h2 class="text-3xl font-extrabold text-white mb-2">Atendimento Médico Online</h2>
+        <p class="text-slate-400">Conecte-se com profissionais de saúde em tempo real de forma simples e segura.</p>
       </div>
-    </section>
 
-    <!-- 2. ABA MÉDICO -->
-    <section id="tab-medico" class="tab-content hidden space-y-6">
-      <div id="box-medico-auth" class="max-w-md mx-auto bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-6 shadow-sm dark:shadow-none">
-        <div class="flex border-b border-slate-200 dark:border-slate-800 pb-3 gap-4">
-          <button type="button" id="btn-med-login-view" class="flex-1 py-2 text-sm font-semibold text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-500 dark:border-cyan-400">Login</button>
-          <button type="button" id="btn-med-cad-view" class="flex-1 py-2 text-sm font-semibold text-slate-400 hover:text-slate-800 dark:hover:text-white">Novo Cadastro</button>
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md">
+        <button onclick="selecionarPerfil('paciente')" class="p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 rounded-2xl flex flex-col items-center gap-3 transition group text-center shadow-lg">
+          <div class="w-14 h-14 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            <i class="fa-solid fa-user-injured"></i>
+          </div>
+          <div>
+            <span class="block font-bold text-lg text-white">Sou Paciente</span>
+            <span class="text-xs text-slate-400">Entrar na fila de atendimento</span>
+          </div>
+        </button>
 
-        <form id="form-login-medico" class="space-y-4">
-          <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">CPF</label>
-            <input type="text" id="med-login-cpf" placeholder="000.000.000-00" maxlength="14" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+        <button onclick="selecionarPerfil('medico')" class="p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500/50 rounded-2xl flex flex-col items-center gap-3 transition group text-center shadow-lg">
+          <div class="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            <i class="fa-solid fa-user-md"></i>
           </div>
           <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">Senha</label>
-            <input type="password" id="med-login-senha" placeholder="Sua senha" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+            <span class="block font-bold text-lg text-white">Sou Médico</span>
+            <span class="text-xs text-slate-400">Acessar consultório virtual</span>
           </div>
-          <button type="submit" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl text-sm transition">Acessar Painel</button>
-        </form>
+        </button>
+      </div>
+    </div>
 
-        <form id="form-cadastro-medico" class="hidden space-y-4">
+    <!-- TELA 2: FORMULÁRIO PACIENTE & FILA DE ESPERA -->
+    <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
+      <!-- FORMULÁRIO ENTRADA -->
+      <div id="paciente-form-container" class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+        <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-clipboard-user text-cyan-400"></i> Ficha do Paciente
+        </h3>
+        <form id="form-paciente" onsubmit="entrarFilaPaciente(event)" class="space-y-4">
           <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
-            <input type="text" id="med-cad-nome" placeholder="Dr. / Dra. Nome" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
+            <input type="text" id="paciente-nome" required placeholder="Digite seu nome completo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
           </div>
           <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">CPF</label>
-            <input type="text" id="med-cad-cpf" placeholder="000.000.000-00" maxlength="14" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">CPF</label>
+            <input type="text" id="paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
           </div>
           <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">E-mail</label>
-            <input type="email" id="med-cad-email" placeholder="medico@saude.gov.br" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Sintomas / Observação Inicial</label>
+            <textarea id="paciente-sintomas" rows="2" placeholder="Descreva brevemente o que está sentindo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></textarea>
           </div>
-          <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">CRM / UF</label>
-            <input type="text" id="med-cad-crm" placeholder="123456/CE" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+
+          <!-- TERMO LGPD -->
+          <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-700/50 text-xs text-slate-400 space-y-2">
+            <div class="flex items-start gap-2">
+              <input type="checkbox" id="check-lgpd" required class="mt-0.5 rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0">
+              <label for="check-lgpd" class="leading-tight">Concordo com o Termo de Consentimento Livre e Esclarecido (TCLE) e com a utilização dos meus dados para atendimento de Telemedicina de acordo com a LGPD.</label>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">Senha</label>
-            <input type="password" id="med-cad-senha" placeholder="Crie uma senha" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
+
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">Voltar</button>
+            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Solicitar Atendimento</button>
           </div>
-          <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm transition">Enviar Cadastro para Aprovação</button>
         </form>
       </div>
 
-      <div id="dashboard-medico" class="hidden space-y-6">
-        <div class="flex items-center justify-between bg-white dark:bg-brand-panel p-6 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none">
+      <!-- STATUS DA FILA DE ESPERA -->
+      <div id="paciente-espera-container" class="hidden w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 text-center shadow-xl space-y-4">
+        <div class="w-16 h-16 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-3xl mx-auto animate-pulse">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold text-white">Você está na fila de espera</h3>
+          <p class="text-xs text-slate-400 mt-1">Aguarde. Um médico disponível irá chamá-lo para a sala de atendimento em instantes.</p>
+        </div>
+        <div class="p-4 bg-slate-900/80 rounded-xl border border-slate-700">
+          <span class="text-xs text-slate-400 block mb-1">Sua posição aproximada:</span>
+          <span id="paciente-posicao-fila" class="text-2xl font-extrabold text-cyan-400">1º</span>
+        </div>
+        <button onclick="cancelarAtendimentoPaciente()" class="text-xs text-red-400 hover:underline">Cancelar solicitação</button>
+      </div>
+    </div>
+
+    <!-- TELA 3: PAINEL DO MÉDICO -->
+    <div id="screen-medico" class="hidden flex-1 flex flex-col gap-4">
+      <!-- CONTAINER DE LOGIN/CADASTRO DO MÉDICO -->
+      <div id="medico-auth-container" class="max-w-md w-full mx-auto my-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+        <div class="flex border-b border-slate-700 mb-4">
+          <button id="tab-login" onclick="alternarAbaMedico('login')" class="flex-1 py-2 text-sm font-bold text-emerald-400 border-b-2 border-emerald-400">Entrar</button>
+          <button id="tab-cadastro" onclick="alternarAbaMedico('cadastro')" class="flex-1 py-2 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-white">Cadastrar CRM</button>
+        </div>
+
+        <!-- FORM LOGIN MÉDICO -->
+        <form id="form-medico-login" onsubmit="fazerLoginMedico(event)" class="space-y-4">
           <div>
-            <h2 id="saudacao-medico" class="text-xl font-bold text-slate-900 dark:text-white">Painel Médico</h2>
-            <p id="count-fila" class="text-xs text-cyan-600 dark:text-cyan-400 mt-1">0 pacientes em espera</p>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">CPF do Médico</label>
+            <input type="text" id="login-medico-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
           </div>
-          <button id="btn-logout-medico" class="px-4 py-2 bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-300 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900 text-xs font-semibold rounded-xl transition">
-            Sair / Logoff
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Senha</label>
+            <input type="password" id="login-medico-senha" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">Voltar</button>
+            <button type="submit" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-emerald-600/20">Acessar Consultório</button>
+          </div>
+        </form>
+
+        <!-- FORM CADASTRO MÉDICO -->
+        <form id="form-medico-cadastro" onsubmit="fazerCadastroMedico(event)" class="hidden space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
+            <input type="text" id="cad-medico-nome" required placeholder="Dr. Nome Exemplo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">CPF</label>
+              <input type="text" id="cad-medico-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">CRM / UF</label>
+              <input type="text" id="cad-medico-crm" required placeholder="123456/CE" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">E-mail Profissional</label>
+            <input type="email" id="cad-medico-email" placeholder="medico@saude.gov.br" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso</label>
+            <input type="password" id="cad-medico-senha" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">Voltar</button>
+            <button type="submit" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-emerald-600/20">Solicitar Credenciamento</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- DASHBOARD DO MÉDICO LOGADO -->
+      <div id="medico-dashboard" class="hidden flex-1 flex flex-col md:flex-row gap-4">
+        <!-- BARRA LATERAL: FILA DE PACIENTES -->
+        <div class="w-full md:w-80 bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col shadow-xl">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+              <h3 class="font-bold text-sm text-white">Pacientes na Fila</h3>
+            </div>
+            <span id="medico-fila-count" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-400">0</span>
+          </div>
+
+          <div id="medico-lista-pacientes" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[400px] md:max-h-none">
+            <p class="text-xs text-slate-500 text-center py-8">Nenhum paciente na fila no momento.</p>
+          </div>
+
+          <div class="pt-3 border-t border-slate-700 mt-auto flex items-center justify-between">
+            <div class="text-xs">
+              <span id="medico-logado-nome" class="font-bold text-slate-200 block">Dr. Médico</span>
+              <span id="medico-logado-crm" class="text-slate-400">CRM: ---</span>
+            </div>
+            <button onclick="logoutMedico()" class="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 bg-red-500/10 rounded">Sair</button>
+          </div>
+        </div>
+
+        <!-- ÁREA CENTRAL DE ATENDIMENTO/BOAS VINDAS -->
+        <div class="flex-1 bg-slate-800 border border-slate-700 rounded-2xl p-6 flex flex-col justify-center items-center text-center shadow-xl">
+          <div class="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-3xl mb-3">
+            <i class="fa-solid fa-stethoscope"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-1">Consultório Médico Ativo</h3>
+          <p class="text-xs text-slate-400 max-w-sm">Aguarde novas chamadas na fila ao lado e clique em "Chamar Paciente" para iniciar a teleconsulta com vídeo.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TELA 4: SALA DE TELECONSULTA WEBRTC (VÍDEO) -->
+    <div id="screen-room" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col">
+      <!-- HEADER SALA -->
+      <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+          <span id="room-status-text" class="text-xs font-bold text-slate-200">Em Atendimento ao Vivo</span>
+        </div>
+        <button onclick="solicitarEncerrarConsulta()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold text-white transition shadow">
+          <i class="fa-solid fa-phone-slash mr-1"></i> Encerrar Consulta
+        </button>
+      </div>
+
+      <!-- ÁREA DE VÍDEO COMPATÍVEL CROSS-PLATFORM (IOS / ANDROID / PC) -->
+      <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+        
+        <!-- VÍDEO REMOTO (MÉDICO OU PACIENTE) -->
+        <video id="remote-video" autoplay playsinline webkit-playsinline class="w-full h-full object-cover"></video>
+
+        <!-- VÍDEO LOCAL (Sua Própria Câmera - Muted Obrigatório) -->
+        <div class="absolute bottom-4 right-4 w-28 h-40 sm:w-36 sm:h-52 bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl z-20">
+          <video id="local-video" autoplay muted playsinline webkit-playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+        </div>
+
+        <!-- CONTROLES DE MÍDIA -->
+        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900/80 backdrop-blur border border-slate-700/80 rounded-full px-4 py-2 flex items-center gap-3 z-20 shadow-xl">
+          <button id="btn-toggle-audio" onclick="toggleAudio()" class="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 transition">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+          <button id="btn-toggle-video" onclick="toggleVideo()" class="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 transition">
+            <i class="fa-solid fa-video"></i>
           </button>
         </div>
-
-        <div class="bg-white dark:bg-brand-panel p-6 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 shadow-sm dark:shadow-none">
-          <h3 id="medico-fila-header" class="text-md font-semibold text-slate-900 dark:text-white">Fila de Atendimento em Tempo Real</h3>
-          <ul id="lista-pacientes-fila" class="space-y-3"></ul>
-        </div>
       </div>
-    </section>
-
-    <!-- 3. ABA ADMINISTRADOR -->
-    <section id="tab-admin" class="tab-content hidden space-y-6">
-      <div id="login-admin-box" class="max-w-md mx-auto bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm dark:shadow-none">
-        <h2 id="admin-login-header" class="text-lg font-bold text-slate-900 dark:text-white">Gestão de Telemedicina</h2>
-        <form id="form-login-admin" class="space-y-4">
-          <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">Usuário Gestor</label>
-            <input type="text" id="adm-user" placeholder="Admin" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-700 dark:text-slate-300 mb-1">Senha</label>
-            <input type="password" id="adm-pass" placeholder="••••••••" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none">
-          </div>
-          <button type="submit" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl text-sm transition">
-            Entrar no Painel Gestor
-          </button>
-        </form>
-      </div>
-
-      <div id="dashboard-admin" class="hidden space-y-6">
-        <div class="flex items-center justify-between bg-white dark:bg-brand-panel p-6 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none">
-          <h2 id="admin-dash-header" class="text-xl font-bold text-slate-900 dark:text-white">Gestão Geral</h2>
-          <div class="flex items-center gap-3">
-            <!-- BOTÃO DE ZERAR ESTATÍSTICAS -->
-            <button id="btn-zerar-stats" onclick="zerarEstatisticasAdmin()" class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-2">
-              <i class="fa-solid fa-rotate-left"></i> Zerar Estatísticas
-            </button>
-            <button id="btn-logout-admin" class="px-4 py-2 bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-300 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900 text-xs font-semibold rounded-xl transition">
-              Sair / Logoff
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="bg-white dark:bg-brand-panel p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none">
-            <span class="text-xs text-slate-500 dark:text-slate-400">Consultas Hoje</span>
-            <p id="count-atendimentos-hoje" class="text-2xl font-bold text-slate-900 dark:text-white mt-1">0</p>
-          </div>
-          <div class="bg-white dark:bg-brand-panel p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none">
-            <span class="text-xs text-slate-500 dark:text-slate-400">Consultas no Mês</span>
-            <p id="count-atendimentos-mes" class="text-2xl font-bold text-slate-900 dark:text-white mt-1">0</p>
-          </div>
-          <div class="bg-white dark:bg-brand-panel p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none">
-            <span class="text-xs text-slate-500 dark:text-slate-400">Acessos Totais</span>
-            <p id="count-total-acessos" class="text-2xl font-bold text-slate-900 dark:text-white mt-1">0</p>
-          </div>
-          <div class="bg-white dark:bg-brand-panel p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none">
-            <span class="text-xs text-slate-500 dark:text-slate-400">Pacientes na Fila</span>
-            <p id="count-admin-fila" class="text-2xl font-bold text-slate-900 dark:text-white mt-1">0</p>
-          </div>
-        </div>
-
-        <div class="bg-white dark:bg-brand-panel p-6 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 shadow-sm dark:shadow-none">
-          <h3 class="text-md font-semibold text-slate-900 dark:text-white">Aprovação & Gestão de Médicos</h3>
-          <div id="lista-medicos-admin" class="space-y-3"></div>
-        </div>
-
-        <div class="bg-white dark:bg-brand-panel p-6 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 shadow-sm dark:shadow-none">
-          <h3 class="text-md font-semibold text-slate-900 dark:text-white">Registro do Histórico & Download ZIP</h3>
-          <ul id="lista-logs-consultas" class="space-y-3"></ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- 4. SALA DE CONSULTA EM VÍDEO -->
-    <section id="sala-consulta" class="hidden space-y-4">
-      <div id="info-medico-paciente-banner" class="bg-cyan-950/60 border border-cyan-800/50 p-3 rounded-xl flex items-center justify-between text-xs text-cyan-300">
-        <span class="flex items-center gap-2">
-          <i class="fa-solid fa-circle-user text-base"></i>
-          <span id="nome-medico-atendendo">Em consulta médica</span>
-        </span>
-        <span id="webrtc-status-log" class="font-mono text-slate-400">Conectando vídeo...</span>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[580px]">
-        <div class="lg:col-span-7 flex flex-col space-y-4">
-          <div class="relative flex-1 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden min-h-[380px] flex items-center justify-center">
-            <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
-            <div class="absolute bottom-4 right-4 w-36 h-48 bg-slate-900 border-2 border-cyan-500/50 rounded-xl overflow-hidden shadow-2xl z-20">
-              <video id="local-video" autoplay muted playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
-            </div>
-          </div>
-
-          <div class="bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 p-3 rounded-2xl flex items-center justify-center gap-4 shadow-sm dark:shadow-none">
-            <button id="btn-toggle-mic" onclick="toggleMic()" class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white flex items-center justify-center text-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700">🎤</button>
-            <button id="btn-toggle-cam" onclick="toggleCam()" class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white flex items-center justify-center text-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700">📷</button>
-            <button id="btn-encerrar-consulta" class="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition">Encerrar Consulta</button>
-          </div>
-        </div>
-
-        <div class="lg:col-span-5 bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col space-y-4 shadow-sm dark:shadow-none">
-          <div id="anamnese-box" class="flex-1 flex flex-col space-y-2">
-            <h3 class="text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Ficha Clínico-Anamnese</h3>
-            <textarea id="texto-anamnese" placeholder="Sintomas, hipótese diagnóstica e conduta médica..." class="flex-1 w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 resize-none min-h-[160px]"></textarea>
-          </div>
-
-          <div id="chat-arquivos-box" class="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-3">
-            <h3 id="titulo-documentos" class="text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Documentos da Consulta</h3>
-            <div id="lista-arquivos" class="space-y-2 max-h-[120px] overflow-y-auto">
-              <p class="empty-files text-xs text-slate-500">Nenhum documento anexado ainda.</p>
-            </div>
-
-            <div id="area-upload-medico" class="pt-2">
-              <input type="file" id="input-arquivo" class="hidden">
-              <button type="button" class="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition flex items-center justify-center gap-2" onclick="document.getElementById('input-arquivo').click()">
-                <i class="fa-solid fa-paperclip"></i> Enviar Receita / Exame (PDF)
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
+    </div>
   </main>
 
-  <!-- MODAL DE CHAMADA RECEBIDA (DESTRAVA AUTOPLAY NO IPHONE E ANDROID) -->
-  <div id="modal-chamada-recebida" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
-      <div class="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center text-3xl mx-auto animate-bounce">
-        <i class="fa-solid fa-phone-incoming"></i>
+  <!-- MODAL DE CHAMADA NO MOBILE/IOS (TOUCH TO ACCEPT EXPLÍCITO) -->
+  <div id="modal-chamada" class="hidden fixed inset-0 bg-slate-950/90 bg-blur z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl space-y-4">
+      <div class="w-16 h-16 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-3xl mx-auto animate-bounce">
+        <i class="fa-solid fa-video"></i>
       </div>
-      <h3 class="text-lg font-bold text-slate-900 dark:text-white">Chamada Médica Recebida!</h3>
-      <p id="modal-chamada-medico-nome" class="text-xs text-slate-500 dark:text-slate-400">O médico está pronto para iniciar seu atendimento.</p>
-      <button id="btn-aceitar-chamada-mobile" type="button" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
-        <i class="fa-solid fa-video"></i> Entrar na Consulta Agora
+      <div>
+        <h3 class="text-xl font-bold text-white">Chamada Médica</h3>
+        <p id="modal-chamada-medico-nome" class="text-sm text-cyan-400 font-semibold mt-1">O Médico está chamando você!</p>
+        <p class="text-xs text-slate-400 mt-2">Clique no botão abaixo para autorizar câmera e microfone e entrar na consulta.</p>
+      </div>
+      <button onclick="aceitarChamadaTouch()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white text-sm shadow-lg shadow-emerald-600/30 transition transform active:scale-95">
+        <i class="fa-solid fa-phone mr-2"></i> ATENDER CONSULTA AGORA
       </button>
     </div>
   </div>
 
-  <!-- MODAL LGPD DINÂMICO -->
-  <div id="modal-privacidade" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-brand-panel border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto space-y-4 text-xs text-slate-700 dark:text-slate-300">
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-        <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <i class="fa-solid fa-shield-halved text-cyan-500"></i> Termos de Privacidade e Proteção de Dados (LGPD)
+  <!-- MODAL PAINEL GESTOR / ADMIN -->
+  <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950/80 bg-blur z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 my-8">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <h3 class="font-bold text-lg text-white flex items-center gap-2">
+          <i class="fa-solid fa-chart-line text-cyan-400"></i> Painel Gestor & Estatísticas
         </h3>
-        <button type="button" onclick="fecharModalPrivacidade()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">&times;</button>
-      </div>
-      
-      <div class="space-y-3 leading-relaxed">
-        <p><strong>1. Coleta e Finalidade dos Dados:</strong> Os dados pessoais informados (Nome, CPF, Telefone, Endereço e E-mail) e os dados de saúde registrados em consulta são coletados exclusivamente para a prestação dos serviços de telemedicina e emissão de prontuário médico municipal.</p>
-        <p><strong>2. Base Legal e Consentimento:</strong> O tratamento de dados sensíveis de saúde é realizado mediante consentimento explícito do titular e tutela da saúde, nos termos do Art. 7º e Art. 11º da Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p>
-        <p><strong>3. Armazenamento e Sigilo Médico:</strong> Todas as informações trocadas durante o atendimento são protegidas por sigilo médico, em conformidade com as resoluções do Conselho Federal de Medicina (CFM). Os relatórios e prontuários gerados são armazenados em ambiente seguro.</p>
-        <p><strong>4. Direitos do Titular:</strong> O paciente pode solicitar a confirmação da existência de tratamento, acesso ou correção de seus dados pessoais a qualquer momento mediante contato com a administração da plataforma.</p>
+        <button onclick="fecharModalAdmin()" class="text-slate-400 hover:text-white text-xl">&times;</button>
       </div>
 
-      <div class="pt-3 border-t border-slate-200 dark:border-slate-800 text-right">
-        <button type="button" onclick="fecharModalPrivacidade()" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition">
-          Entendi e Concordo
-        </button>
+      <!-- FORM LOGIN ADMIN -->
+      <div id="admin-login-sec" class="space-y-4 max-w-sm mx-auto py-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Usuário Gestor</label>
+          <input type="text" id="admin-user" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Senha</label>
+          <input type="password" id="admin-pass" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <button onclick="autenticarAdmin()" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition">Acessar Painel</button>
+      </div>
+
+      <!-- CONTEÚDO ADMIN LOGADO -->
+      <div id="admin-content-sec" class="hidden space-y-6">
+        <!-- CONTADORES MULTI-PERÍODO -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendimentos Hoje</span>
+            <span id="stat-hoje" class="text-2xl font-black text-cyan-400">0</span>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendimentos Mês</span>
+            <span id="stat-mes" class="text-2xl font-black text-emerald-400">0</span>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendimentos Ano</span>
+            <span id="stat-ano" class="text-2xl font-black text-purple-400">0</span>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Geral Acessos</span>
+            <span id="stat-total" class="text-2xl font-black text-amber-400">0</span>
+          </div>
+        </div>
+
+        <!-- AÇÕES DO ADMIN -->
+        <div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+          <span class="text-xs text-slate-400">Limpar histórico para demonstração ao cliente:</span>
+          <button onclick="zerarEstatisticasAdmin()" class="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition">
+            <i class="fa-solid fa-rotate-left mr-1"></i> Zerar Contadores
+          </button>
+        </div>
+
+        <!-- LISTA DE MÉDICOS PARA APROVAÇÃO -->
+        <div>
+          <h4 class="font-bold text-sm text-white mb-2">Credenciamento de Médicos</h4>
+          <div id="admin-lista-medicos" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+            <p class="text-xs text-slate-500 text-center py-2">Carregando médicos...</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script src="/js/main.js"></script>
 </body>
 </html>

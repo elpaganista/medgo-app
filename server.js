@@ -6,64 +6,25 @@ const fs = require('fs');
 const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const archiver = require('archiver');
-const Database = require('better-sqlite3');
 
 process.env.TZ = 'America/Fortaleza';
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { 
+  cors: { origin: "*" },
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// DIRETÓRIOS E BANCO DE DADOS SQLITE
 ['uploads', 'logs', 'data'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
-
-const dbPath = path.join(__dirname, 'data', 'database.db');
-const db = new Database(dbPath);
-
-// INICIALIZAÇÃO DAS TABELAS NO SQLITE
-db.exec(`
-  CREATE TABLE IF NOT EXISTS medicos (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    nome TEXT NOT NULL,
-    cpf TEXT UNIQUE NOT NULL,
-    email TEXT,
-    crm TEXT NOT NULL,
-    senha TEXT NOT NULL,
-    status TEXT DEFAULT 'pendente',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS estatisticas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tenant_id TEXT NOT NULL,
-    perfil TEXT NOT NULL,
-    data_hoje TEXT NOT NULL,
-    semana_ano TEXT NOT NULL,
-    mes_ano TEXT NOT NULL,
-    ano TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS prontuarios_lgpd (
-    session_id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    medico_nome TEXT,
-    medico_crm TEXT,
-    paciente_nome TEXT,
-    paciente_cpf TEXT,
-    consentimento_lgpd INTEGER,
-    data_hora TEXT,
-    zip_path TEXT
-  );
-`);
 
 // TENANTS MULTI-DOMÍNIO
 const FILE_TENANTS = path.join(__dirname, 'data', 'tenants.json');
@@ -90,26 +51,56 @@ function identificarTenantKey(req) {
   return 'default';
 }
 
+function getTenantPath(tenantId, fileName) {
+  const dir = path.join(__dirname, 'data', tenantId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, fileName);
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 const upload = multer({ storage });
 
-// FUNÇÕES AUXILIARES DO SQLITE
-function obterMedicosComStatusSQL(tenantId) {
-  const stmt = db.prepare('SELECT id, nome, crm, cpf, email, status AS statusCadastro FROM medicos WHERE tenant_id = ?');
-  const medicos = stmt.all(tenantId);
-  const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
-
-  return medicos.map(m => ({
-    ...m,
-    isOnline: cpfsOnline.has(m.cpf)
-  }));
+function carregarMedicos(tenantId) {
+  const file = getTenantPath(tenantId, 'medicos.json');
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify([], null, 2));
+    return [];
+  }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return []; }
 }
 
-function registrarAcessoSQL(tenantKey, perfil = 'geral') {
+function salvarMedicos(tenantId, lista) {
+  try { fs.writeFileSync(getTenantPath(tenantId, 'medicos.json'), JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
+}
+
+function carregarStats(tenantId) {
+  const file = getTenantPath(tenantId, 'estatisticas.json');
+  const padrao = { 
+    totalGeralAcessos: 0, 
+    perfis: { medicos: 0, pacientes: 0, geral: 0 },
+    historicoDiario: {}, 
+    historicoSemanal: {},
+    historicoMensal: {},
+    historicoAnual: {}
+  };
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify(padrao, null, 2));
+    return padrao;
+  }
+  try { return { ...padrao, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch (err) { return padrao; }
+}
+
+function salvarStats(tenantId, stats) {
+  try { fs.writeFileSync(getTenantPath(tenantId, 'estatisticas.json'), JSON.stringify(stats, null, 2)); } catch (err) { console.error(err); }
+}
+
+function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
+  const stats = carregarStats(tenantKey);
   const agora = new Date();
+  
   const dataHoje = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
   const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
   const anoAtual = `${agora.getFullYear()}`;
@@ -118,37 +109,28 @@ function registrarAcessoSQL(tenantKey, perfil = 'geral') {
   const dias = Math.floor((agora - inicioAno) / (24 * 60 * 60 * 1000));
   const semanaAtual = `Semana ${Math.ceil((dias + inicioAno.getDay() + 1) / 7)} - ${anoAtual}`;
 
-  const stmt = db.prepare(`
-    INSERT INTO estatisticas (tenant_id, perfil, data_hoje, semana_ano, mes_ano, ano)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  stmt.run(tenantKey, perfil, dataHoje, semanaAtual, mesAno, anoAtual);
-}
+  if (!stats.perfis) stats.perfis = { medicos: 0, pacientes: 0, geral: 0 };
+  if (!stats.historicoDiario) stats.historicoDiario = {};
+  if (!stats.historicoSemanal) stats.historicoSemanal = {};
+  if (!stats.historicoMensal) stats.historicoMensal = {};
+  if (!stats.historicoAnual) stats.historicoAnual = {};
 
-function obterEstatisticasSQL(tenantKey) {
-  const dh = obterDataHoraBR();
+  stats.totalGeralAcessos = (stats.totalGeralAcessos || 0) + 1;
+  stats.perfis[tipoPerfil] = (stats.perfis[tipoPerfil] || 0) + 1;
 
-  const totalGeral = db.prepare('SELECT COUNT(*) AS total FROM estatisticas WHERE tenant_id = ?').get(tenantKey).total;
-  const hoje = db.prepare('SELECT COUNT(*) AS total FROM estatisticas WHERE tenant_id = ? AND data_hoje = ?').get(tenantKey, dh.data).total;
-  const mes = db.prepare('SELECT COUNT(*) AS total FROM estatisticas WHERE tenant_id = ? AND mes_ano = ?').get(tenantKey, dh.mesAno).total;
-  const ano = db.prepare('SELECT COUNT(*) AS total FROM estatisticas WHERE tenant_id = ? AND ano = ?').get(tenantKey, dh.ano).total;
+  stats.historicoDiario[dataHoje] = (stats.historicoDiario[dataHoje] || 0) + 1;
+  stats.historicoSemanal[semanaAtual] = (stats.historicoSemanal[semanaAtual] || 0) + 1;
+  stats.historicoMensal[mesAno] = (stats.historicoMensal[mesAno] || 0) + 1;
+  stats.historicoAnual[anoAtual] = (stats.historicoAnual[anoAtual] || 0) + 1;
 
-  const medicosCount = db.prepare('SELECT COUNT(*) AS total FROM estatisticas WHERE tenant_id = ? AND perfil = ?').get(tenantKey, 'medicos').total;
-  const pacientesCount = db.prepare('SELECT COUNT(*) AS total FROM estatisticas WHERE tenant_id = ? AND perfil = ?').get(tenantKey, 'pacientes').total;
-
-  return {
-    totalGeralAcessos: totalGeral,
-    atendimentosHoje: hoje,
-    atendimentosMes: mes,
-    atendimentosAno: ano,
-    perfis: { medicos: medicosCount, pacientes: pacientesCount, geral: totalGeral }
-  };
+  salvarStats(tenantKey, stats);
 }
 
 let filaPacientes = [];
 let registroPacientesGeral = [];
 let consultasAtivas = new Map();
 let medicosOnline = new Map();
+let logsConsultas = [];
 
 function obterDataHoraBR() {
   const agora = new Date();
@@ -161,7 +143,21 @@ function obterDataHoraBR() {
   };
 }
 
-// ENDPOINTS DA API REESTRUTURADOS COM SQLITE
+function obterMedicosComStatus(tenantId) {
+  const medicos = carregarMedicos(tenantId);
+  const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
+  return medicos.map(m => ({
+    id: m.id,
+    nome: m.nome,
+    crm: m.crm,
+    cpf: m.cpf,
+    email: m.email,
+    statusCadastro: m.status,
+    isOnline: cpfsOnline.has(m.cpf)
+  }));
+}
+
+// ENDPOINTS DA API
 app.get('/api/tenant/info', (req, res) => {
   tenants = carregarTenants();
   const key = identificarTenantKey(req);
@@ -175,34 +171,31 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
 
 app.post('/api/medico/cadastro', (req, res) => {
   const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
   const { nome, cpf, email, crm, senha } = req.body;
 
   if (!nome || !cpf || !crm || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
+  if (medicos.find(m => m.cpf === cpf)) return res.status(400).json({ error: 'CPF já cadastrado.' });
 
-  try {
-    const stmt = db.prepare('INSERT INTO medicos (id, tenant_id, nome, cpf, email, crm, senha, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    stmt.run(Date.now().toString(), key, nome, cpf, email, crm, senha, 'pendente');
+  const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
+  medicos.push(novoMedico);
+  salvarMedicos(key, medicos);
 
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatusSQL(key));
-    res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
-  } catch (err) {
-    if (err.message.includes('UNIQUE')) return res.status(400).json({ error: 'CPF já cadastrado.' });
-    res.status(500).json({ error: 'Erro ao realizar cadastro.' });
-  }
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
 });
 
 app.post('/api/medico/login', (req, res) => {
   const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
   const { cpf, senha } = req.body;
 
-  const stmt = db.prepare('SELECT * FROM medicos WHERE tenant_id = ? AND cpf = ? AND senha = ?');
-  const medico = stmt.get(key, cpf, senha);
-
+  const medico = medicos.find(m => m.cpf === cpf && m.senha === senha);
   if (!medico) return res.status(401).json({ error: 'CPF ou Senha incorretos.' });
   if (medico.status === 'pendente') return res.status(403).json({ error: 'Cadastro pendente de aprovação.' });
   if (medico.status === 'bloqueado') return res.status(403).json({ error: 'Conta médica bloqueada.' });
 
-  registrarAcessoSQL(key, 'medicos');
+  registrarAcessoAvancado(key, 'medicos');
 
   res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
 });
@@ -218,46 +211,60 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/dados', (req, res) => {
   const key = identificarTenantKey(req);
-  const stats = obterEstatisticasSQL(key);
-  
-  const logs = db.prepare('SELECT session_id AS sessionId, paciente_nome AS paciente, medico_nome AS medico, data_hora AS data, zip_path AS zipUrl FROM prontuarios_lgpd WHERE tenant_id = ? ORDER BY data_hora DESC').all(key);
+  const statsGeral = carregarStats(key);
+  const dh = obterDataHoraBR();
 
   res.json({
-    medicos: obterMedicosComStatusSQL(key),
-    logsConsultas: logs,
+    medicos: obterMedicosComStatus(key),
+    logsConsultas,
     registroPacientesGeral,
-    ...stats,
+    perfis: statsGeral.perfis || { medicos: 0, pacientes: 0, geral: 0 },
+    atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+    atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
+    atendimentosAno: statsGeral.historicoAnual[dh.ano] || 0,
+    totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
     filaAtualCount: filaPacientes.length
   });
 });
 
-// ZERAR ESTATÍSTICAS DO CLIENTE NO SQLITE
 app.post('/api/admin/zerar-stats', (req, res) => {
   const key = identificarTenantKey(req);
-  const stmt = db.prepare('DELETE FROM estatisticas WHERE tenant_id = ?');
-  stmt.run(key);
-  res.json({ success: true, message: 'Estatísticas zeradas no banco SQLite para o cliente!' });
+  const statsZeradas = {
+    totalGeralAcessos: 0,
+    perfis: { medicos: 0, pacientes: 0, geral: 0 },
+    historicoDiario: {},
+    historicoSemanal: {},
+    historicoMensal: {},
+    historicoAnual: {}
+  };
+  salvarStats(key, statsZeradas);
+  res.json({ success: true, message: 'Contadores zerados com sucesso!' });
 });
 
 app.post('/api/admin/medico/status', (req, res) => {
   const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
   const { medicoId, novoStatus } = req.body;
 
-  const stmt = db.prepare('UPDATE medicos SET status = ? WHERE id = ? AND tenant_id = ?');
-  stmt.run(novoStatus, medicoId, key);
-
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatusSQL(key));
-  res.json({ success: true });
+  const medico = medicos.find(m => m.id === medicoId);
+  if (medico) {
+    medico.status = novoStatus;
+    salvarMedicos(key, medicos);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Médico não encontrado.' });
+  }
 });
 
 app.post('/api/admin/medico/excluir', (req, res) => {
   const key = identificarTenantKey(req);
+  let medicos = carregarMedicos(key);
   const { medicoId } = req.body;
 
-  const stmt = db.prepare('DELETE FROM medicos WHERE id = ? AND tenant_id = ?');
-  stmt.run(medicoId, key);
-
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatusSQL(key));
+  medicos = medicos.filter(m => m.id !== medicoId);
+  salvarMedicos(key, medicos);
+  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
   res.json({ success: true });
 });
 
@@ -270,9 +277,14 @@ app.get('/api/admin/download-log/:sessionId', (req, res) => {
 function processarFinalizacaoConsulta(dados, tenantKey) {
   try {
     const dh = obterDataHoraBR();
-    registrarAcessoSQL(tenantKey, 'consultas_concluidas');
-
+    const stats = carregarStats(tenantKey);
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
+
+    stats.historicoDiario[dh.data] = (stats.historicoDiario[dh.data] || 0) + 1;
+    stats.historicoMensal[dh.mesAno] = (stats.historicoMensal[dh.mesAno] || 0) + 1;
+    stats.historicoAnual[dh.ano] = (stats.historicoAnual[dh.ano] || 0) + 1;
+    salvarStats(tenantKey, stats);
+
     const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
     const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
 
@@ -308,18 +320,21 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
         archive.finalize();
 
         output.on('close', () => {
-          const stmtProntuario = db.prepare(`
-            INSERT INTO prontuarios_lgpd (session_id, tenant_id, medico_nome, medico_crm, paciente_nome, paciente_cpf, consentimento_lgpd, data_hora, zip_path)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-          `);
-          stmtProntuario.run(sessionId, tenantKey, medico?.nome, medico?.crm, paciente?.nome, paciente?.cpf, dh.dataHoraCompleta, `/api/admin/download-log/${sessionId}`);
-
-          const stats = obterEstatisticasSQL(tenantKey);
-          const logs = db.prepare('SELECT session_id AS sessionId, paciente_nome AS paciente, medico_nome AS medico, data_hora AS data, zip_path AS zipUrl FROM prontuarios_lgpd WHERE tenant_id = ? ORDER BY data_hora DESC').all(tenantKey);
+          logsConsultas.push({
+            sessionId,
+            paciente: paciente?.nome || 'Paciente',
+            medico: medico?.nome || 'Dr. Plantonista',
+            data: dh.dataHoraCompleta,
+            zipUrl: `/api/admin/download-log/${sessionId}`
+          });
 
           io.emit('atualizar-admin-dashboard', {
-            logsConsultas: logs,
-            ...stats,
+            logsConsultas,
+            perfis: stats.perfis,
+            atendimentosHoje: stats.historicoDiario[dh.data] || 0,
+            atendimentosMes: stats.historicoMensal[dh.mesAno] || 0,
+            atendimentosAno: stats.historicoAnual[dh.ano] || 0,
+            totalGeralAcessos: stats.totalGeralAcessos || 0,
             registroPacientesGeral,
             filaAtualCount: filaPacientes.length
           });
@@ -329,28 +344,28 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
   } catch (err) { console.error('Erro geral ao finalizar:', err); }
 }
 
-// WEBSOCKETS
+// WEBSOCKETS E SINALIZAÇÃO WEBRTC
 io.on('connection', (socket) => {
   const reqHost = socket.handshake.headers.host || '';
   const tenantKey = reqHost.includes('paracuru') ? 'paracuru' : (reqHost.includes('palmacia') ? 'palmacia' : 'default');
 
-  registrarAcessoSQL(tenantKey, 'geral');
+  registrarAcessoAvancado(tenantKey, 'geral');
 
   socket.emit('atualizar-fila', filaPacientes);
-  socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatusSQL(tenantKey));
+  socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
 
   socket.on('medico-online', (medico) => {
     medicosOnline.set(socket.id, medico);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatusSQL(tenantKey));
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 
   socket.on('medico-offline', () => {
     medicosOnline.delete(socket.id);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatusSQL(tenantKey));
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 
   socket.on('entrar-fila', (dados) => {
-    registrarAcessoSQL(tenantKey, 'pacientes');
+    registrarAcessoAvancado(tenantKey, 'pacientes');
     
     const dh = obterDataHoraBR();
     const paciente = { 
@@ -390,6 +405,8 @@ io.on('connection', (socket) => {
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
     io.emit('atualizar-fila', filaPacientes);
+    
+    // Notifica o paciente imediatamente
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
       sender: socket.id,
@@ -399,7 +416,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // SINALIZAÇÃO WEBRTC
+  // ROTAS DE SINALIZAÇÃO WEBRTC (CROSS-PLATFORM)
   socket.on('paciente-pronto-para-oferta', (data) => {
     const { targetId } = data;
     if (targetId) {
@@ -408,15 +425,21 @@ io.on('connection', (socket) => {
   });
 
   socket.on('webrtc-offer', (data) => {
-    io.to(data.targetId).emit('webrtc-offer', { offer: data.offer, senderId: socket.id });
+    if (data.targetId) {
+      io.to(data.targetId).emit('webrtc-offer', { offer: data.offer, senderId: socket.id });
+    }
   });
 
   socket.on('webrtc-answer', (data) => {
-    io.to(data.targetId).emit('webrtc-answer', { answer: data.answer, senderId: socket.id });
+    if (data.targetId) {
+      io.to(data.targetId).emit('webrtc-answer', { answer: data.answer, senderId: socket.id });
+    }
   });
 
   socket.on('webrtc-candidate', (data) => {
-    io.to(data.targetId).emit('webrtc-candidate', { candidate: data.candidate, senderId: socket.id });
+    if (data.targetId) {
+      io.to(data.targetId).emit('webrtc-candidate', { candidate: data.candidate, senderId: socket.id });
+    }
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
@@ -461,4 +484,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Servidor MedGo com Banco SQLite ativo na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Servidor MedGo Ativo e Estável na porta ${PORT}`));
