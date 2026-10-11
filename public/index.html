@@ -9,17 +9,16 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .bg-blur { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-    /* Prevenir seleção de texto e ajustar toque em mobile */
     video { object-fit: cover; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
 
-  <!-- HEADER / BRANDING DINÂMICO -->
+  <!-- HEADER BRANDING -->
   <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <img id="tenant-logo" src="/images/medgo-logo.png" alt="Logo" class="h-10 w-auto object-contain">
+        <img id="tenant-logo" src="/images/medgo-logo.png" alt="Logo" class="h-10 w-auto object-contain" onerror="this.src='/images/medgo-logo.png'">
         <div>
           <h1 id="tenant-nome" class="font-bold text-lg leading-tight text-white">MedGo Telemedicina</h1>
           <p id="tenant-subtitulo" class="text-xs text-slate-400">Plataforma de Saúde Digital</p>
@@ -27,17 +26,17 @@
       </div>
       <div class="flex items-center gap-2">
         <span id="tenant-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">TELEMEDICINA</span>
-        <button id="btn-admin-access" onclick="abrirModalAdmin()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded transition">
+        <button onclick="abrirModalAdmin()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded transition">
           <i class="fa-solid fa-lock"></i>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- CONTEÚDO PRINCIPAL (TELAS A/B/C) -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col">
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col justify-center">
     
-    <!-- TELA 1: SELEÇÃO DE PERFIL (PACIENTE / MÉDICO) -->
+    <!-- TELA 1: LANDING / SELEÇÃO -->
     <div id="screen-landing" class="flex-1 flex flex-col justify-center items-center py-8">
       <div class="text-center max-w-lg mb-8">
         <h2 class="text-3xl font-extrabold text-white mb-2">Atendimento Médico Online</h2>
@@ -45,7 +44,7 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md">
-        <button onclick="selecionarPerfil('paciente')" class="p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 rounded-2xl flex flex-col items-center gap-3 transition group text-center shadow-lg">
+        <button onclick="selecionarPerfil('paciente')" class="p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 rounded-2xl flex flex-col items-center gap-3 transition group text-center shadow-lg cursor-pointer">
           <div class="w-14 h-14 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
             <i class="fa-solid fa-user-injured"></i>
           </div>
@@ -55,7 +54,7 @@
           </div>
         </button>
 
-        <button onclick="selecionarPerfil('medico')" class="p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500/50 rounded-2xl flex flex-col items-center gap-3 transition group text-center shadow-lg">
+        <button onclick="selecionarPerfil('medico')" class="p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500/50 rounded-2xl flex flex-col items-center gap-3 transition group text-center shadow-lg cursor-pointer">
           <div class="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
             <i class="fa-solid fa-user-md"></i>
           </div>
@@ -67,14 +66,13 @@
       </div>
     </div>
 
-    <!-- TELA 2: FORMULÁRIO PACIENTE & FILA DE ESPERA -->
+    <!-- TELA PACIENTE -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
-      <!-- FORMULÁRIO ENTRADA -->
       <div id="paciente-form-container" class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
           <i class="fa-solid fa-clipboard-user text-cyan-400"></i> Ficha do Paciente
         </h3>
-        <form id="form-paciente" onsubmit="entrarFilaPaciente(event)" class="space-y-4">
+        <form onsubmit="entrarFilaPaciente(event)" class="space-y-4">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
             <input type="text" id="paciente-nome" required placeholder="Digite seu nome completo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
@@ -87,15 +85,10 @@
             <label class="block text-xs font-semibold text-slate-300 mb-1">Sintomas / Observação Inicial</label>
             <textarea id="paciente-sintomas" rows="2" placeholder="Descreva brevemente o que está sentindo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></textarea>
           </div>
-
-          <!-- TERMO LGPD -->
-          <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-700/50 text-xs text-slate-400 space-y-2">
-            <div class="flex items-start gap-2">
-              <input type="checkbox" id="check-lgpd" required class="mt-0.5 rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0">
-              <label for="check-lgpd" class="leading-tight">Concordo com o Termo de Consentimento Livre e Esclarecido (TCLE) e com a utilização dos meus dados para atendimento de Telemedicina de acordo com a LGPD.</label>
-            </div>
+          <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-700/50 text-xs text-slate-400 flex items-start gap-2">
+            <input type="checkbox" id="check-lgpd" required class="mt-0.5 rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0">
+            <label for="check-lgpd" class="leading-tight">Aceito os termos do TCLE e o uso dos meus dados para telemedicina (LGPD).</label>
           </div>
-
           <div class="flex gap-2 pt-2">
             <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">Voltar</button>
             <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Solicitar Atendimento</button>
@@ -103,33 +96,24 @@
         </form>
       </div>
 
-      <!-- STATUS DA FILA DE ESPERA -->
       <div id="paciente-espera-container" class="hidden w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 text-center shadow-xl space-y-4">
         <div class="w-16 h-16 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-3xl mx-auto animate-pulse">
           <i class="fa-solid fa-clock"></i>
         </div>
-        <div>
-          <h3 class="text-xl font-bold text-white">Você está na fila de espera</h3>
-          <p class="text-xs text-slate-400 mt-1">Aguarde. Um médico disponível irá chamá-lo para a sala de atendimento em instantes.</p>
-        </div>
-        <div class="p-4 bg-slate-900/80 rounded-xl border border-slate-700">
-          <span class="text-xs text-slate-400 block mb-1">Sua posição aproximada:</span>
-          <span id="paciente-posicao-fila" class="text-2xl font-extrabold text-cyan-400">1º</span>
-        </div>
+        <h3 class="text-xl font-bold text-white">Você está na fila de espera</h3>
+        <p class="text-xs text-slate-400">Aguarde. O médico chamará você para a sala em breve.</p>
         <button onclick="cancelarAtendimentoPaciente()" class="text-xs text-red-400 hover:underline">Cancelar solicitação</button>
       </div>
     </div>
 
-    <!-- TELA 3: PAINEL DO MÉDICO -->
+    <!-- TELA MÉDICO -->
     <div id="screen-medico" class="hidden flex-1 flex flex-col gap-4">
-      <!-- CONTAINER DE LOGIN/CADASTRO DO MÉDICO -->
       <div id="medico-auth-container" class="max-w-md w-full mx-auto my-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <div class="flex border-b border-slate-700 mb-4">
           <button id="tab-login" onclick="alternarAbaMedico('login')" class="flex-1 py-2 text-sm font-bold text-emerald-400 border-b-2 border-emerald-400">Entrar</button>
           <button id="tab-cadastro" onclick="alternarAbaMedico('cadastro')" class="flex-1 py-2 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-white">Cadastrar CRM</button>
         </div>
 
-        <!-- FORM LOGIN MÉDICO -->
         <form id="form-medico-login" onsubmit="fazerLoginMedico(event)" class="space-y-4">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">CPF do Médico</label>
@@ -145,7 +129,6 @@
           </div>
         </form>
 
-        <!-- FORM CADASTRO MÉDICO -->
         <form id="form-medico-cadastro" onsubmit="fazerCadastroMedico(event)" class="hidden space-y-3">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
@@ -176,9 +159,7 @@
         </form>
       </div>
 
-      <!-- DASHBOARD DO MÉDICO LOGADO -->
       <div id="medico-dashboard" class="hidden flex-1 flex flex-col md:flex-row gap-4">
-        <!-- BARRA LATERAL: FILA DE PACIENTES -->
         <div class="w-full md:w-80 bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col shadow-xl">
           <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-3">
             <div class="flex items-center gap-2">
@@ -187,11 +168,9 @@
             </div>
             <span id="medico-fila-count" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-400">0</span>
           </div>
-
           <div id="medico-lista-pacientes" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[400px] md:max-h-none">
             <p class="text-xs text-slate-500 text-center py-8">Nenhum paciente na fila no momento.</p>
           </div>
-
           <div class="pt-3 border-t border-slate-700 mt-auto flex items-center justify-between">
             <div class="text-xs">
               <span id="medico-logado-nome" class="font-bold text-slate-200 block">Dr. Médico</span>
@@ -201,55 +180,38 @@
           </div>
         </div>
 
-        <!-- ÁREA CENTRAL DE ATENDIMENTO/BOAS VINDAS -->
         <div class="flex-1 bg-slate-800 border border-slate-700 rounded-2xl p-6 flex flex-col justify-center items-center text-center shadow-xl">
           <div class="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-3xl mb-3">
             <i class="fa-solid fa-stethoscope"></i>
           </div>
           <h3 class="text-xl font-bold text-white mb-1">Consultório Médico Ativo</h3>
-          <p class="text-xs text-slate-400 max-w-sm">Aguarde novas chamadas na fila ao lado e clique em "Chamar Paciente" para iniciar a teleconsulta com vídeo.</p>
+          <p class="text-xs text-slate-400 max-w-sm">Aguarde chamadas na fila e clique em "Chamar Paciente" para iniciar a teleconsulta com vídeo.</p>
         </div>
       </div>
     </div>
 
-    <!-- TELA 4: SALA DE TELECONSULTA WEBRTC (VÍDEO) -->
+    <!-- TELA SALA DE VÍDEO (WEBRTC CROSS-PLATFORM) -->
     <div id="screen-room" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col">
-      <!-- HEADER SALA -->
       <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
         <div class="flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
-          <span id="room-status-text" class="text-xs font-bold text-slate-200">Em Atendimento ao Vivo</span>
+          <span class="text-xs font-bold text-slate-200">Consulta ao Vivo</span>
         </div>
-        <button onclick="solicitarEncerrarConsulta()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold text-white transition shadow">
+        <button onclick="encerrarConsulta()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold text-white transition shadow">
           <i class="fa-solid fa-phone-slash mr-1"></i> Encerrar Consulta
         </button>
       </div>
 
-      <!-- ÁREA DE VÍDEO COMPATÍVEL CROSS-PLATFORM (IOS / ANDROID / PC) -->
       <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-        
-        <!-- VÍDEO REMOTO (MÉDICO OU PACIENTE) -->
         <video id="remote-video" autoplay playsinline webkit-playsinline class="w-full h-full object-cover"></video>
-
-        <!-- VÍDEO LOCAL (Sua Própria Câmera - Muted Obrigatório) -->
         <div class="absolute bottom-4 right-4 w-28 h-40 sm:w-36 sm:h-52 bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl z-20">
           <video id="local-video" autoplay muted playsinline webkit-playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
-        </div>
-
-        <!-- CONTROLES DE MÍDIA -->
-        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900/80 backdrop-blur border border-slate-700/80 rounded-full px-4 py-2 flex items-center gap-3 z-20 shadow-xl">
-          <button id="btn-toggle-audio" onclick="toggleAudio()" class="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 transition">
-            <i class="fa-solid fa-microphone"></i>
-          </button>
-          <button id="btn-toggle-video" onclick="toggleVideo()" class="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 transition">
-            <i class="fa-solid fa-video"></i>
-          </button>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- MODAL DE CHAMADA NO MOBILE/IOS (TOUCH TO ACCEPT EXPLÍCITO) -->
+  <!-- MODAL CHAMADA IOS/MOBILE -->
   <div id="modal-chamada" class="hidden fixed inset-0 bg-slate-950/90 bg-blur z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl space-y-4">
       <div class="w-16 h-16 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-3xl mx-auto animate-bounce">
@@ -257,79 +219,311 @@
       </div>
       <div>
         <h3 class="text-xl font-bold text-white">Chamada Médica</h3>
-        <p id="modal-chamada-medico-nome" class="text-sm text-cyan-400 font-semibold mt-1">O Médico está chamando você!</p>
-        <p class="text-xs text-slate-400 mt-2">Clique no botão abaixo para autorizar câmera e microfone e entrar na consulta.</p>
+        <p class="text-xs text-slate-400 mt-2">Clique no botão para autorizar câmera/microfone e entrar na consulta.</p>
       </div>
-      <button onclick="aceitarChamadaTouch()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white text-sm shadow-lg shadow-emerald-600/30 transition transform active:scale-95">
-        <i class="fa-solid fa-phone mr-2"></i> ATENDER CONSULTA AGORA
+      <button onclick="aceitarChamadaTouch()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white text-sm shadow-lg transition">
+        ATENDER CONSULTA AGORA
       </button>
     </div>
   </div>
 
-  <!-- MODAL PAINEL GESTOR / ADMIN -->
+  <!-- MODAL ADMIN -->
   <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950/80 bg-blur z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 my-8">
       <div class="flex items-center justify-between pb-3 border-b border-slate-700">
-        <h3 class="font-bold text-lg text-white flex items-center gap-2">
-          <i class="fa-solid fa-chart-line text-cyan-400"></i> Painel Gestor & Estatísticas
-        </h3>
+        <h3 class="font-bold text-lg text-white">Painel Gestor</h3>
         <button onclick="fecharModalAdmin()" class="text-slate-400 hover:text-white text-xl">&times;</button>
       </div>
-
-      <!-- FORM LOGIN ADMIN -->
       <div id="admin-login-sec" class="space-y-4 max-w-sm mx-auto py-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Usuário Gestor</label>
-          <input type="text" id="admin-user" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Senha</label>
-          <input type="password" id="admin-pass" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-        </div>
-        <button onclick="autenticarAdmin()" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition">Acessar Painel</button>
+        <input type="text" id="admin-user" placeholder="Usuário" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        <input type="password" id="admin-pass" placeholder="Senha" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        <button onclick="autenticarAdmin()" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white">Entrar</button>
       </div>
-
-      <!-- CONTEÚDO ADMIN LOGADO -->
       <div id="admin-content-sec" class="hidden space-y-6">
-        <!-- CONTADORES MULTI-PERÍODO -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendimentos Hoje</span>
-            <span id="stat-hoje" class="text-2xl font-black text-cyan-400">0</span>
-          </div>
-          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendimentos Mês</span>
-            <span id="stat-mes" class="text-2xl font-black text-emerald-400">0</span>
-          </div>
-          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendimentos Ano</span>
-            <span id="stat-ano" class="text-2xl font-black text-purple-400">0</span>
-          </div>
-          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl">
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Geral Acessos</span>
-            <span id="stat-total" class="text-2xl font-black text-amber-400">0</span>
-          </div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Hoje</span><span id="stat-hoje" class="text-2xl font-black text-cyan-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Mês</span><span id="stat-mes" class="text-2xl font-black text-emerald-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Ano</span><span id="stat-ano" class="text-2xl font-black text-purple-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Total</span><span id="stat-total" class="text-2xl font-black text-amber-400">0</span></div>
         </div>
-
-        <!-- AÇÕES DO ADMIN -->
-        <div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
-          <span class="text-xs text-slate-400">Limpar histórico para demonstração ao cliente:</span>
-          <button onclick="zerarEstatisticasAdmin()" class="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition">
-            <i class="fa-solid fa-rotate-left mr-1"></i> Zerar Contadores
-          </button>
-        </div>
-
-        <!-- LISTA DE MÉDICOS PARA APROVAÇÃO -->
-        <div>
-          <h4 class="font-bold text-sm text-white mb-2">Credenciamento de Médicos</h4>
-          <div id="admin-lista-medicos" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
-            <p class="text-xs text-slate-500 text-center py-2">Carregando médicos...</p>
-          </div>
-        </div>
+        <button onclick="zerarEstatisticasAdmin()" class="px-3 py-1.5 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold">Zerar Contadores</button>
+        <div id="admin-lista-medicos" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
       </div>
     </div>
   </div>
 
-  <script src="/js/main.js"></script>
+  <!-- SCRIPT FRONTEND WEBRTC COMPLETO -->
+  <script>
+    const socket = io();
+    let localStream = null;
+    let peerConnection = null;
+    let targetSocketId = null;
+    let medicoLogado = null;
+    let chamandoDados = null;
+
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
+
+    // NAVEGAÇÃO DE TELAS
+    function esconderTelas() {
+      ['screen-landing', 'screen-paciente', 'screen-medico', 'screen-room'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+    }
+
+    function selecionarPerfil(perfil) {
+      esconderTelas();
+      if (perfil === 'paciente') document.getElementById('screen-paciente').classList.remove('hidden');
+      if (perfil === 'medico') document.getElementById('screen-medico').classList.remove('hidden');
+    }
+
+    function voltarParaLanding() {
+      esconderTelas();
+      document.getElementById('screen-landing').classList.remove('hidden');
+    }
+
+    function alternarAbaMedico(aba) {
+      if (aba === 'login') {
+        document.getElementById('form-medico-login').classList.remove('hidden');
+        document.getElementById('form-medico-cadastro').classList.add('hidden');
+      } else {
+        document.getElementById('form-medico-login').classList.add('hidden');
+        document.getElementById('form-medico-cadastro').classList.remove('hidden');
+      }
+    }
+
+    // TENANT INFO DYN
+    fetch('/api/tenant/info')
+      .then(res => res.json())
+      .then(t => {
+        if (t.nome) document.getElementById('tenant-nome').innerText = t.nome;
+        if (t.subtitulo) document.getElementById('tenant-subtitulo').innerText = t.subtitulo;
+        if (t.badge) document.getElementById('tenant-badge').innerText = t.badge;
+        if (t.logo) document.getElementById('tenant-logo').src = t.logo;
+      }).catch(console.error);
+
+    // PACIENTE
+    function entrarFilaPaciente(e) {
+      e.preventDefault();
+      const nome = document.getElementById('paciente-nome').value;
+      const cpf = document.getElementById('paciente-cpf').value;
+      const sintomas = document.getElementById('paciente-sintomas').value;
+
+      socket.emit('entrar-fila', { nome, cpf, sintomas });
+      document.getElementById('paciente-form-container').classList.add('hidden');
+      document.getElementById('paciente-espera-container').classList.remove('hidden');
+    }
+
+    function cancelarAtendimentoPaciente() {
+      location.reload();
+    }
+
+    // MÉDICO
+    function fazerLoginMedico(e) {
+      e.preventDefault();
+      const cpf = document.getElementById('login-medico-cpf').value;
+      const senha = document.getElementById('login-medico-senha').value;
+
+      fetch('/api/medico/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ cpf, senha })
+      }).then(r => r.json()).then(res => {
+        if (res.success) {
+          medicoLogado = res.medico;
+          document.getElementById('medico-auth-container').classList.add('hidden');
+          document.getElementById('medico-dashboard').classList.remove('hidden');
+          document.getElementById('medico-logado-nome').innerText = medicoLogado.nome;
+          document.getElementById('medico-logado-crm').innerText = 'CRM: ' + medicoLogado.crm;
+          socket.emit('medico-online', medicoLogado);
+        } else { alert(res.error || 'Erro ao entrar'); }
+      });
+    }
+
+    function fazerCadastroMedico(e) {
+      e.preventDefault();
+      const nome = document.getElementById('cad-medico-nome').value;
+      const cpf = document.getElementById('cad-medico-cpf').value;
+      const crm = document.getElementById('cad-medico-crm').value;
+      const email = document.getElementById('cad-medico-email').value;
+      const senha = document.getElementById('cad-medico-senha').value;
+
+      fetch('/api/medico/cadastro', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nome, cpf, crm, email, senha })
+      }).then(r => r.json()).then(res => {
+        alert(res.message || res.error);
+        if (res.success) alternarAbaMedico('login');
+      });
+    }
+
+    function logoutMedico() { location.reload(); }
+
+    // FILA ATUALIZAÇÃO
+    socket.on('atualizar-fila', (fila) => {
+      const container = document.getElementById('medico-lista-pacientes');
+      document.getElementById('medico-fila-count').innerText = fila.length;
+
+      if (!fila.length) {
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-8">Nenhum paciente na fila no momento.</p>';
+        return;
+      }
+
+      container.innerHTML = fila.map(p => `
+        <div class="p-3 bg-slate-900 border border-slate-700 rounded-xl flex items-center justify-between gap-2">
+          <div>
+            <span class="font-bold text-xs text-white block">${p.nome}</span>
+            <span class="text-[10px] text-slate-400">CPF: ${p.cpf}</span>
+          </div>
+          <button onclick="chamarPaciente('${p.id}')" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition">Chamar</button>
+        </div>
+      `).join('');
+    });
+
+    function chamarPaciente(pacienteSocketId) {
+      targetSocketId = pacienteSocketId;
+      socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medicoLogado, roomId: Date.now() });
+      iniciarConsulta();
+    }
+
+    // WEBRTC VIDEO ENGINE
+    async function iniciarMidiaLocal() {
+      if (!localStream) {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById('local-video').srcObject = localStream;
+      }
+    }
+
+    async function iniciarConsulta() {
+      esconderTelas();
+      document.getElementById('screen-room').classList.remove('hidden');
+      await iniciarMidiaLocal();
+      criarPeerConnection();
+    }
+
+    function criarPeerConnection() {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+      peerConnection.ontrack = (event) => {
+        document.getElementById('remote-video').srcObject = event.streams[0];
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate && targetSocketId) {
+          socket.emit('webrtc-candidate', { candidate: event.candidate, targetId: targetSocketId });
+        }
+      };
+
+      if (medicoLogado) {
+        peerConnection.onnegotiationneeded = async () => {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          socket.emit('webrtc-offer', { offer, targetId: targetSocketId });
+        };
+      }
+    }
+
+    socket.on('chamado-para-consulta', (dados) => {
+      chamandoDados = dados;
+      targetSocketId = dados.medicoSocketId;
+      document.getElementById('modal-chamada').classList.remove('hidden');
+    });
+
+    async function aceitarChamadaTouch() {
+      document.getElementById('modal-chamada').classList.add('hidden');
+      await iniciarConsulta();
+      socket.emit('paciente-pronto-para-oferta', { targetId: targetSocketId });
+    }
+
+    socket.on('iniciar-criacao-oferta', async () => {
+      if (peerConnection && medicoLogado) {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        socket.emit('webrtc-offer', { offer, targetId: targetSocketId });
+      }
+    });
+
+    socket.on('webrtc-offer', async (data) => {
+      targetSocketId = data.senderId;
+      if (!peerConnection) await iniciarConsulta();
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      socket.emit('webrtc-answer', { answer, targetId: targetSocketId });
+    });
+
+    socket.on('webrtc-answer', async (data) => {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    });
+
+    socket.on('webrtc-candidate', async (data) => {
+      if (peerConnection) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+
+    function encerrarConsulta() {
+      socket.emit('finalizar-consulta');
+      location.reload();
+    }
+
+    socket.on('consulta-encerrada', () => location.reload());
+
+    // ADMIN MODAL
+    function abrirModalAdmin() { document.getElementById('modal-admin').classList.remove('hidden'); }
+    function fecharModalAdmin() { document.getElementById('modal-admin').classList.add('hidden'); }
+
+    function autenticarAdmin() {
+      const user = document.getElementById('admin-user').value;
+      const pass = document.getElementById('admin-pass').value;
+
+      fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user, pass })
+      }).then(r => r.json()).then(res => {
+        if (res.success) {
+          document.getElementById('admin-login-sec').classList.add('hidden');
+          document.getElementById('admin-content-sec').classList.remove('hidden');
+          carregarDadosAdmin();
+        } else { alert('Acesso negado'); }
+      });
+    }
+
+    function carregarDadosAdmin() {
+      fetch('/api/admin/dados').then(r => r.json()).then(d => {
+        document.getElementById('stat-hoje').innerText = d.atendimentosHoje || 0;
+        document.getElementById('stat-mes').innerText = d.atendimentosMes || 0;
+        document.getElementById('stat-ano').innerText = d.atendimentosAno || 0;
+        document.getElementById('stat-total').innerText = d.totalGeralAcessos || 0;
+
+        document.getElementById('admin-lista-medicos').innerHTML = (d.medicos || []).map(m => `
+          <div class="flex items-center justify-between text-xs text-slate-300 py-1 border-b border-slate-800">
+            <span>${m.nome} (CRM: ${m.crm}) - <strong class="text-amber-400">${m.statusCadastro}</strong></span>
+            ${m.statusCadastro === 'pendente' ? `<button onclick="aprovarMedico('${m.id}')" class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded">Aprovar</button>` : ''}
+          </div>
+        `).join('') || '<p class="text-xs text-slate-500">Nenhum médico.</p>';
+      });
+    }
+
+    function aprovarMedico(medicoId) {
+      fetch('/api/admin/medico/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ medicoId, novoStatus: 'aprovado' })
+      }).then(() => carregarDadosAdmin());
+    }
+
+    function zerarEstatisticasAdmin() {
+      fetch('/api/admin/zerar-stats', { method: 'POST' }).then(() => carregarDadosAdmin());
+    }
+  </script>
 </body>
 </html>
