@@ -406,7 +406,6 @@ io.on('connection', (socket) => {
 
     io.emit('atualizar-fila', filaPacientes);
     
-    // Notifica o paciente imediatamente
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
       sender: socket.id,
@@ -416,11 +415,10 @@ io.on('connection', (socket) => {
     });
   });
 
-  // ROTAS DE SINALIZAÇÃO WEBRTC (CROSS-PLATFORM)
+  // ROTAS DE SINALIZAÇÃO WEBRTC
   socket.on('paciente-pronto-para-oferta', (data) => {
-    const { targetId } = data;
-    if (targetId) {
-      io.to(targetId).emit('iniciar-criacao-oferta', { pacienteSocketId: socket.id });
+    if (data.targetId) {
+      io.to(data.targetId).emit('iniciar-criacao-oferta', { pacienteSocketId: socket.id });
     }
   });
 
@@ -439,6 +437,13 @@ io.on('connection', (socket) => {
   socket.on('webrtc-candidate', (data) => {
     if (data.targetId) {
       io.to(data.targetId).emit('webrtc-candidate', { candidate: data.candidate, senderId: socket.id });
+    }
+  });
+
+  // CHAT E ENVIO DE ARQUIVOS DURANTE A CONSULTA
+  socket.on('enviar-mensagem-chat', (data) => {
+    if (data.targetId) {
+      io.to(data.targetId).emit('receber-mensagem-chat', { sender: data.sender, msg: data.msg });
     }
   });
 
