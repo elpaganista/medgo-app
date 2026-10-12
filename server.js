@@ -170,17 +170,31 @@ app.get('/api/tenant/info', (req, res) => {
   res.json(tenants[key] || tenants['default']);
 });
 
-// Servidores ICE (STUN/TURN). Para TURN próprio defina TURN_URL, TURN_USER e TURN_PASS no ambiente.
+// Servidores ICE (STUN/TURN) com redundância expandida
 app.get('/api/ice-config', (req, res) => {
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
   ];
-  if (process.env.TURN_URL) {
-    iceServers.push({ urls: process.env.TURN_URL.split(','), username: process.env.TURN_USER, credential: process.env.TURN_PASS });
+
+  if (process.env.TURN_URL && process.env.TURN_USER && process.env.TURN_PASS) {
+    const urlsArray = process.env.TURN_URL.split(',').map(u => u.trim());
+    iceServers.push({
+      urls: urlsArray,
+      username: process.env.TURN_USER,
+      credential: process.env.TURN_PASS
+    });
   } else {
-    iceServers.push({ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' });
+    // Fallback público estendido com portas de alta compatibilidade para CGNAT
+    iceServers.push(
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    );
   }
+
   res.json({ iceServers });
 });
 
