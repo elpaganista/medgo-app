@@ -9,6 +9,10 @@ const archiver = require('archiver');
 
 process.env.TZ = 'America/Fortaleza';
 
+// Evita que um erro isolado derrube o servidor (e encerre todas as chamadas)
+process.on('uncaughtException', (err) => console.error('uncaughtException:', err));
+process.on('unhandledRejection', (err) => console.error('unhandledRejection:', err));
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
@@ -28,8 +32,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // TENANTS MULTI-DOMÍNIO
 const FILE_TENANTS = path.join(__dirname, 'data', 'tenants.json');
+const FILE_TENANTS_ROOT = path.join(__dirname, 'tenants.json');
 
 function carregarTenants() {
+  if (!fs.existsSync(FILE_TENANTS) && fs.existsSync(FILE_TENANTS_ROOT)) fs.copyFileSync(FILE_TENANTS_ROOT, FILE_TENANTS);
   if (!fs.existsSync(FILE_TENANTS)) {
     const padrao = {
       "default": { id: "medgo", nome: "MedGo Telemedicina", subtitulo: "Plataforma de Saúde Digital", badge: "TELEMEDICINA", logo: "/images/medgo-logo.png" },
@@ -162,6 +168,20 @@ app.get('/api/tenant/info', (req, res) => {
   tenants = carregarTenants();
   const key = identificarTenantKey(req);
   res.json(tenants[key] || tenants['default']);
+});
+
+// Servidores ICE (STUN/TURN). Para TURN próprio defina TURN_URL, TURN_USER e TURN_PASS no ambiente.
+app.get('/api/ice-config', (req, res) => {
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+  if (process.env.TURN_URL) {
+    iceServers.push({ urls: process.env.TURN_URL.split(','), username: process.env.TURN_USER, credential: process.env.TURN_PASS });
+  } else {
+    iceServers.push({ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' });
+  }
+  res.json({ iceServers });
 });
 
 app.post('/api/upload', upload.single('arquivo'), (req, res) => {
@@ -384,7 +404,8 @@ io.on('connection', (socket) => {
   socket.on('chamar-paciente', (dadosChamada) => {
     const { pacienteSocketId, medicoInfo, roomId } = dadosChamada;
     const paciente = filaPacientes.find(p => p.id === pacienteSocketId);
-    if (paciente) paciente.status = 'Em Atendimento';
+    if (!paciente) { socket.emit('paciente-indisponivel'); return; }
+    paciente.status = 'Em Atendimento';
     
     filaPacientes = filaPacientes.filter(p => p.id !== pacienteSocketId);
     
@@ -484,7 +505,7 @@ io.on('connection', (socket) => {
     }
 
     io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-lista-medicos-geral', statusMedicos => statusMedicos);
+    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 });
 
