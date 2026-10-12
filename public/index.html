@@ -22,23 +22,29 @@
 </head>
 <body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans antialiased transition-colors duration-200 overflow-x-hidden">
 
-  <!-- HEADER BRANDING -->
+  <!-- HEADER BRANDING CENTRALIZADO E LOGO AUMENTADA -->
   <header class="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <img id="tenant-logo" src="/images/medgo-logo.png" alt="Logo" class="h-10 w-auto object-contain" onerror="this.onerror=null;this.src='/images/medgo-logo.png'">
-        <div>
-          <h1 id="tenant-nome" class="font-bold text-lg leading-tight text-slate-900 dark:text-white">MedGo Telemedicina</h1>
-          <p id="tenant-subtitulo" class="text-xs text-slate-500 dark:text-slate-400">Plataforma de Saúde Digital</p>
-        </div>
+      
+      <!-- LADO ESQUERDO: LOGO AUMENTADA -->
+      <div class="flex items-center">
+        <img id="tenant-logo" src="/images/medgo-logo.png" alt="Logo" class="h-14 sm:h-16 w-auto object-contain transition-all" onerror="this.onerror=null;this.src='/images/medgo-logo.png'">
       </div>
+
+      <!-- CENTRO: NOME DA PREFEITURA / SECRETARIA CENTRALIZADO -->
+      <div class="text-center flex-1 px-2">
+        <h1 id="tenant-nome" class="font-extrabold text-base sm:text-xl leading-tight text-slate-900 dark:text-white">MedGo Telemedicina</h1>
+        <p id="tenant-subtitulo" class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">Plataforma de Saúde Digital</p>
+      </div>
+
+      <!-- LADO DIREITO: TEMA, BADGE TELEMEDICINA E CADEADO ADMIN -->
       <div class="flex items-center gap-2">
         <button onclick="alternarTema()" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-cyan-500 transition text-xs font-bold flex items-center gap-1.5" title="Alternar Tema">
           <i id="theme-icon" class="fa-solid fa-moon"></i>
           <span id="theme-text" class="hidden sm:inline">Escuro</span>
         </button>
 
-        <span id="tenant-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">TELEMEDICINA</span>
+        <span id="tenant-badge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">TELEMEDICINA</span>
         
         <button onclick="abrirModalAdmin()" class="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-white px-2 py-1 rounded transition">
           <i class="fa-solid fa-lock"></i>
@@ -210,10 +216,10 @@
       </div>
     </div>
 
-    <!-- TELA SALA DE VÍDEO (RESPONSIVA PARA MOBILE x DESKTOP) -->
+    <!-- TELA SALA DE VÍDEO (LAYOUT MOBILE x DESKTOP) -->
     <div id="screen-room" class="hidden fixed inset-0 bg-black z-50 flex flex-col md:flex-row h-full w-full">
       
-      <!-- VÍDEO (EM MOBILE OCUPA 60vh DO TOPO, EM DESKTOP OCUPA A TELA TODA) -->
+      <!-- LADO ESQUERDO/TOPO: VÍDEO PRINCIPAL (60% DA TELA EM MOBILE, 100% EM DESKTOP) -->
       <div class="h-[60vh] md:h-full flex-1 relative bg-black flex flex-col w-full overflow-hidden">
         <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
           <div class="flex items-center gap-2">
@@ -244,10 +250,10 @@
         </div>
       </div>
 
-      <!-- PAINEL DIREITO: ANAMNESE (MÉDICO) OU RECEITAS/DOCUMENTOS (PACIENTE) -->
+      <!-- LADO DIREITO/INFERIOR: ANAMNESE E DOCUMENTOS -->
       <div class="h-[40vh] md:h-full w-full md:w-96 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col z-30">
         
-        <!-- SOMENTE PARA O MÉDICO: ANAMNESE -->
+        <!-- EXCLUSIVO PARA O MÉDICO: ANAMNESE -->
         <div id="box-anamnese" class="hidden p-4 border-b border-slate-800 bg-slate-900/90">
           <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <i class="fa-solid fa-notes-medical"></i> Anamnese e Prontuário
@@ -255,17 +261,17 @@
           <textarea id="anamnese-texto" rows="3" placeholder="Digite o prontuário e prescrição do paciente..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500"></textarea>
         </div>
 
-        <!-- MENSAGENS E RECEITAS -->
+        <!-- DOCUMENTOS & RECEITAS -->
         <div class="flex-1 flex flex-col p-4 overflow-hidden">
           <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <i class="fa-solid fa-file-medical"></i> Receitas & Documentos
           </h4>
           
           <div id="chat-messages" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto space-y-2 text-xs">
-            <p class="text-[10px] text-slate-500 text-center">Os documentos e receitas enviados durante a consulta aparecerão aqui.</p>
+            <p class="text-[10px] text-slate-500 text-center">Os documentos e receitas enviados durante a consulta aparecerão aqui para download.</p>
           </div>
 
-          <!-- ÁREA DE ENVIO: EXCLUSIVA PARA O MÉDICO (OCULTA PARA PACIENTE) -->
+          <!-- ÁREA DE ENVIO: OCULTA PARA PACIENTE, VISÍVEL APENAS PARA O MÉDICO -->
           <div id="box-envio-medico" class="hidden pt-3 space-y-2">
             <div class="flex items-center gap-2">
               <label for="chat-file-input" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white cursor-pointer transition flex items-center gap-1 text-xs">
@@ -273,7 +279,7 @@
               </label>
               <input type="file" id="chat-file-input" onchange="enviarArquivoChat(event)" class="hidden">
               
-              <input type="text" id="chat-input" placeholder="Mensagem / Obs..." onkeydown="if(event.key==='Enter') enviarMensagemChat()" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+              <input type="text" id="chat-input" placeholder="Observações..." onkeydown="if(event.key==='Enter') enviarMensagemChat()" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
               <button onclick="enviarMensagemChat()" class="p-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition">
                 <i class="fa-solid fa-paper-plane"></i>
               </button>
@@ -285,7 +291,7 @@
     </div>
   </main>
 
-  <!-- MODAL CHAMADA IOS/MOBILE -->
+  <!-- MODAL CHAMADA MOBILE -->
   <div id="modal-chamada" class="hidden fixed inset-0 bg-slate-950/90 bg-blur z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl space-y-4">
       <div class="w-16 h-16 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-3xl mx-auto animate-bounce">

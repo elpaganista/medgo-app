@@ -9,7 +9,6 @@ const archiver = require('archiver');
 
 process.env.TZ = 'America/Fortaleza';
 
-// Evita que um erro isolado derrube o servidor (e encerre todas as chamadas)
 process.on('uncaughtException', (err) => console.error('uncaughtException:', err));
 process.on('unhandledRejection', (err) => console.error('unhandledRejection:', err));
 
@@ -39,8 +38,8 @@ function carregarTenants() {
   if (!fs.existsSync(FILE_TENANTS)) {
     const padrao = {
       "default": { id: "medgo", nome: "MedGo Telemedicina", subtitulo: "Plataforma de Saúde Digital", badge: "TELEMEDICINA", logo: "/images/medgo-logo.png" },
-      "paracuru": { id: "paracuru", nome: "Prefeitura de Paracuru", subtitulo: "Secretaria Municipal de Saúde", badge: "PARACURU", logo: "/images/paracuru-logo.png" },
-      "palmacia": { id: "palmacia", nome: "Prefeitura de Palmácia", subtitulo: "Secretaria Municipal de Saúde", badge: "PALMÁCIA", logo: "/images/palmacia-logo.png" }
+      "paracuru": { id: "paracuru", nome: "Prefeitura de Paracuru", subtitulo: "Secretaria Municipal de Saúde", badge: "TELEMEDICINA", logo: "/images/paracuru-logo.png" },
+      "palmacia": { id: "palmacia", nome: "Prefeitura de Palmácia", subtitulo: "Secretaria Municipal de Saúde", badge: "TELEMEDICINA", logo: "/images/palmacia-logo.png" }
     };
     fs.writeFileSync(FILE_TENANTS, JSON.stringify(padrao, null, 2));
     return padrao;
@@ -110,14 +109,9 @@ function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
   const dataHoje = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
   const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
   const anoAtual = `${agora.getFullYear()}`;
-  
-  const inicioAno = new Date(agora.getFullYear(), 0, 1);
-  const dias = Math.floor((agora - inicioAno) / (24 * 60 * 60 * 1000));
-  const semanaAtual = `Semana ${Math.ceil((dias + inicioAno.getDay() + 1) / 7)} - ${anoAtual}`;
 
   if (!stats.perfis) stats.perfis = { medicos: 0, pacientes: 0, geral: 0 };
   if (!stats.historicoDiario) stats.historicoDiario = {};
-  if (!stats.historicoSemanal) stats.historicoSemanal = {};
   if (!stats.historicoMensal) stats.historicoMensal = {};
   if (!stats.historicoAnual) stats.historicoAnual = {};
 
@@ -125,7 +119,6 @@ function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
   stats.perfis[tipoPerfil] = (stats.perfis[tipoPerfil] || 0) + 1;
 
   stats.historicoDiario[dataHoje] = (stats.historicoDiario[dataHoje] || 0) + 1;
-  stats.historicoSemanal[semanaAtual] = (stats.historicoSemanal[semanaAtual] || 0) + 1;
   stats.historicoMensal[mesAno] = (stats.historicoMensal[mesAno] || 0) + 1;
   stats.historicoAnual[anoAtual] = (stats.historicoAnual[anoAtual] || 0) + 1;
 
@@ -151,7 +144,7 @@ function obterDataHoraBR() {
 
 function obterMedicosComStatus(tenantId) {
   const medicos = carregarMedicos(tenantId);
-  const cpfsOnline = new Set(Array.from(medicosOnline.values()).map(m => m.cpf));
+  const cpfsOnline = new Set(Array.from(medicosOnline.values()).filter(m => m.tenantKey === tenantId).map(m => m.cpf));
   return medicos.map(m => ({
     id: m.id,
     nome: m.nome,
@@ -163,14 +156,18 @@ function obterMedicosComStatus(tenantId) {
   }));
 }
 
+function obterFilaPorTenant(tenantKey) {
+  return filaPacientes.filter(p => p.tenantKey === tenantKey);
+}
+
 // ENDPOINTS DA API
 app.get('/api/tenant/info', (req, res) => {
   tenants = carregarTenants();
   const key = identificarTenantKey(req);
-  res.json(tenants[key] || tenants['default']);
+  const t = tenants[key] || tenants['default'];
+  res.json({ ...t, badge: 'TELEMEDICINA' });
 });
 
-// Servidores ICE (STUN/TURN) com redundância expandida
 app.get('/api/ice-config', (req, res) => {
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -187,7 +184,6 @@ app.get('/api/ice-config', (req, res) => {
       credential: process.env.TURN_PASS
     });
   } else {
-    // Fallback público estendido com portas de alta compatibilidade para CGNAT
     iceServers.push(
       { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
       { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
@@ -215,7 +211,7 @@ app.post('/api/medico/cadastro', (req, res) => {
   medicos.push(novoMedico);
   salvarMedicos(key, medicos);
 
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+  io.to(key).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
   res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
 });
 
@@ -231,7 +227,7 @@ app.post('/api/medico/login', (req, res) => {
 
   registrarAcessoAvancado(key, 'medicos');
 
-  res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf } });
+  res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf, tenantKey: key } });
 });
 
 app.post('/api/admin/login', (req, res) => {
@@ -250,14 +246,14 @@ app.get('/api/admin/dados', (req, res) => {
 
   res.json({
     medicos: obterMedicosComStatus(key),
-    logsConsultas,
-    registroPacientesGeral,
+    logsConsultas: logsConsultas.filter(l => l.tenantKey === key),
+    registroPacientesGeral: registroPacientesGeral.filter(p => p.tenantKey === key),
     perfis: statsGeral.perfis || { medicos: 0, pacientes: 0, geral: 0 },
     atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
     atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
     atendimentosAno: statsGeral.historicoAnual[dh.ano] || 0,
     totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
-    filaAtualCount: filaPacientes.length
+    filaAtualCount: obterFilaPorTenant(key).length
   });
 });
 
@@ -284,7 +280,7 @@ app.post('/api/admin/medico/status', (req, res) => {
   if (medico) {
     medico.status = novoStatus;
     salvarMedicos(key, medicos);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+    io.to(key).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
     res.json({ success: true });
   } else {
     res.status(404).json({ error: 'Médico não encontrado.' });
@@ -298,7 +294,7 @@ app.post('/api/admin/medico/excluir', (req, res) => {
 
   medicos = medicos.filter(m => m.id !== medicoId);
   salvarMedicos(key, medicos);
-  io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+  io.to(key).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
   res.json({ success: true });
 });
 
@@ -356,21 +352,11 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
         output.on('close', () => {
           logsConsultas.push({
             sessionId,
+            tenantKey,
             paciente: paciente?.nome || 'Paciente',
             medico: medico?.nome || 'Dr. Plantonista',
             data: dh.dataHoraCompleta,
             zipUrl: `/api/admin/download-log/${sessionId}`
-          });
-
-          io.emit('atualizar-admin-dashboard', {
-            logsConsultas,
-            perfis: stats.perfis,
-            atendimentosHoje: stats.historicoDiario[dh.data] || 0,
-            atendimentosMes: stats.historicoMensal[dh.mesAno] || 0,
-            atendimentosAno: stats.historicoAnual[dh.ano] || 0,
-            totalGeralAcessos: stats.totalGeralAcessos || 0,
-            registroPacientesGeral,
-            filaAtualCount: filaPacientes.length
           });
         });
       } catch (e) { console.error('Erro no ZIP:', e); }
@@ -378,24 +364,27 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
   } catch (err) { console.error('Erro geral ao finalizar:', err); }
 }
 
-// WEBSOCKETS E SINALIZAÇÃO WEBRTC
+// WEBSOCKETS E ISOLAMENTO POR CIDADE (TENANT ROOMS)
 io.on('connection', (socket) => {
   const reqHost = socket.handshake.headers.host || '';
   const tenantKey = reqHost.includes('paracuru') ? 'paracuru' : (reqHost.includes('palmacia') ? 'palmacia' : 'default');
 
+  // Adiciona a conexão à sala exclusiva da cidade
+  socket.join(tenantKey);
+
   registrarAcessoAvancado(tenantKey, 'geral');
 
-  socket.emit('atualizar-fila', filaPacientes);
+  socket.emit('atualizar-fila', obterFilaPorTenant(tenantKey));
   socket.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
 
   socket.on('medico-online', (medico) => {
-    medicosOnline.set(socket.id, medico);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
+    medicosOnline.set(socket.id, { ...medico, tenantKey });
+    io.to(tenantKey).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 
   socket.on('medico-offline', () => {
     medicosOnline.delete(socket.id);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
+    io.to(tenantKey).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 
   socket.on('entrar-fila', (dados) => {
@@ -404,6 +393,7 @@ io.on('connection', (socket) => {
     const dh = obterDataHoraBR();
     const paciente = { 
       id: socket.id, 
+      tenantKey,
       ...dados, 
       horaEntrada: dh.hora, 
       status: 'Em Espera',
@@ -412,7 +402,8 @@ io.on('connection', (socket) => {
     filaPacientes.push(paciente);
     registroPacientesGeral.push(paciente);
     
-    io.emit('atualizar-fila', filaPacientes);
+    // Atualiza a fila apenas para a cidade correspondente
+    io.to(tenantKey).emit('atualizar-fila', obterFilaPorTenant(tenantKey));
   });
 
   socket.on('chamar-paciente', (dadosChamada) => {
@@ -439,7 +430,7 @@ io.on('connection', (socket) => {
     consultasAtivas.set(socket.id, dadosConsulta);
     consultasAtivas.set(pacienteSocketId, dadosConsulta);
 
-    io.emit('atualizar-fila', filaPacientes);
+    io.to(tenantKey).emit('atualizar-fila', obterFilaPorTenant(tenantKey));
     
     io.to(pacienteSocketId).emit('chamado-para-consulta', { 
       medicoSocketId: socket.id, 
@@ -450,36 +441,24 @@ io.on('connection', (socket) => {
     });
   });
 
-  // ROTAS DE SINALIZAÇÃO WEBRTC
   socket.on('paciente-pronto-para-oferta', (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit('iniciar-criacao-oferta', { pacienteSocketId: socket.id });
-    }
+    if (data.targetId) io.to(data.targetId).emit('iniciar-criacao-oferta', { pacienteSocketId: socket.id });
   });
 
   socket.on('webrtc-offer', (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit('webrtc-offer', { offer: data.offer, senderId: socket.id });
-    }
+    if (data.targetId) io.to(data.targetId).emit('webrtc-offer', { offer: data.offer, senderId: socket.id });
   });
 
   socket.on('webrtc-answer', (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit('webrtc-answer', { answer: data.answer, senderId: socket.id });
-    }
+    if (data.targetId) io.to(data.targetId).emit('webrtc-answer', { answer: data.answer, senderId: socket.id });
   });
 
   socket.on('webrtc-candidate', (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit('webrtc-candidate', { candidate: data.candidate, senderId: socket.id });
-    }
+    if (data.targetId) io.to(data.targetId).emit('webrtc-candidate', { candidate: data.candidate, senderId: socket.id });
   });
 
-  // CHAT E ENVIO DE ARQUIVOS DURANTE A CONSULTA
   socket.on('enviar-mensagem-chat', (data) => {
-    if (data.targetId) {
-      io.to(data.targetId).emit('receber-mensagem-chat', { sender: data.sender, msg: data.msg });
-    }
+    if (data.targetId) io.to(data.targetId).emit('receber-mensagem-chat', { sender: data.sender, msg: data.msg });
   });
 
   socket.on('novo-arquivo-enviado', (data) => {
@@ -518,10 +497,10 @@ io.on('connection', (socket) => {
       consultasAtivas.delete(consulta.pacienteSocketId);
     }
 
-    io.emit('atualizar-fila', filaPacientes);
-    io.emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
+    io.to(tenantKey).emit('atualizar-fila', obterFilaPorTenant(tenantKey));
+    io.to(tenantKey).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(tenantKey));
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Servidor MedGo Ativo e Estável na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Servidor MedGo Multi-Tenant Ativo na porta ${PORT}`));
