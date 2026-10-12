@@ -66,7 +66,7 @@
       </div>
     </div>
 
-    <!-- TELA PACIENTE (FICHA COM NOME, CPF, TELEFONE E ENDEREÇO - SEM SINTOMAS) -->
+    <!-- TELA PACIENTE (FICHA) -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
       <div id="paciente-form-container" class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -196,8 +196,10 @@
       </div>
     </div>
 
-    <!-- TELA SALA DE VÍDEO -->
+    <!-- TELA SALA DE VÍDEO COMPLETA (MÉDICO & PACIENTE COM ÁUDIO/VÍDEO E BOTOES) -->
     <div id="screen-room" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col md:flex-row">
+      
+      <!-- LADO ESQUERDO: ÁREA DE VÍDEO -->
       <div class="flex-1 relative bg-black flex flex-col h-full overflow-hidden">
         <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
           <div class="flex items-center gap-2">
@@ -205,21 +207,34 @@
             <span class="text-xs font-bold text-slate-200">Consulta ao Vivo</span>
           </div>
           <button onclick="encerrarConsulta()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold text-white transition shadow">
-            <i class="fa-solid fa-phone-slash mr-1"></i> Encerrar
+            <i class="fa-solid fa-phone-slash mr-1"></i> Encerrar Consulta
           </button>
         </div>
 
+        <!-- VÍDEO REMOTO + TELINHA LOCAL -->
         <div class="flex-1 relative flex items-center justify-center overflow-hidden">
           <video id="remote-video" autoplay playsinline webkit-playsinline class="w-full h-full object-cover"></video>
-          <div class="absolute bottom-4 right-4 w-28 h-40 sm:w-36 sm:h-52 bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl z-20">
+          
+          <div class="absolute bottom-16 right-4 w-28 h-40 sm:w-36 sm:h-52 bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl z-20">
             <video id="local-video" autoplay muted playsinline webkit-playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+          </div>
+
+          <!-- CONTROLES DE MÍDIA (AMBOS TÊM MUTE E DESLIGAR CÂMERA) -->
+          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-900/80 backdrop-blur border border-slate-700/80 rounded-full px-4 py-2 flex items-center gap-4 z-20 shadow-xl">
+            <button id="btn-toggle-audio" onclick="toggleAudio()" class="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 transition">
+              <i id="icon-audio" class="fa-solid fa-microphone"></i>
+            </button>
+            <button id="btn-toggle-video" onclick="toggleVideo()" class="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 transition">
+              <i id="icon-video" class="fa-solid fa-video"></i>
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- LADO DIREITO: CHAT & ANAMNESE (DIFERENCIADO MÉDICO VS PACIENTE) -->
+      <!-- LADO DIREITO: CHAT & ANAMNESE -->
       <div class="w-full md:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full z-30">
-        <!-- ANAMNESE APENAS PARA O MÉDICO -->
+        
+        <!-- ANAMNESE (APENAS PARA O MÉDICO) -->
         <div id="box-anamnese" class="hidden p-4 border-b border-slate-800 bg-slate-900/90">
           <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <i class="fa-solid fa-notes-medical"></i> Anamnese e Prontuário
@@ -227,7 +242,7 @@
           <textarea id="anamnese-texto" rows="3" placeholder="Digite o prontuário e prescrição do paciente..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500"></textarea>
         </div>
 
-        <!-- CHAT DA CONSULTA -->
+        <!-- CHAT -->
         <div class="flex-1 flex flex-col p-4 overflow-hidden">
           <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <i class="fa-solid fa-comments"></i> Mensagens & Receitas
@@ -239,11 +254,12 @@
 
           <div class="pt-3 space-y-2">
             <div class="flex items-center gap-2">
-              <!-- BOTÃO DE ANEXO: VISÍVEL APENAS PARA O MÉDICO (ENVIO DE RECEITAS/ATESTADOS) -->
+              <!-- BOTÃO DE ANEXO: EXCLUSIVO DO MÉDICO PARA ENVIAR RECEITAS/ATESTADOS -->
               <label id="btn-upload-chat" for="chat-file-input" class="hidden p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white cursor-pointer transition">
                 <i class="fa-solid fa-paperclip"></i>
               </label>
               <input type="file" id="chat-file-input" onchange="enviarArquivoChat(event)" class="hidden">
+              
               <input type="text" id="chat-input" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter') enviarMensagemChat()" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
               <button onclick="enviarMensagemChat()" class="p-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition">
                 <i class="fa-solid fa-paper-plane"></i>
@@ -263,7 +279,7 @@
       </div>
       <div>
         <h3 class="text-xl font-bold text-white">Chamada Médica</h3>
-        <p class="text-xs text-slate-400 mt-2">Toque para aceitar e iniciar o atendimento com vídeo.</p>
+        <p class="text-xs text-slate-400 mt-2">Toque no botão para aceitar e iniciar a consulta com vídeo e áudio.</p>
       </div>
       <button onclick="aceitarChamadaTouch()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white text-sm shadow-lg transition">
         ATENDER CONSULTA AGORA
@@ -271,7 +287,7 @@
     </div>
   </div>
 
-  <!-- MODAL ADMIN COMPLETO COM TODAS AS AÇÕES E LOGS -->
+  <!-- MODAL ADMIN -->
   <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950/80 bg-blur z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 my-8">
       <div class="flex items-center justify-between pb-3 border-b border-slate-700">
@@ -301,14 +317,14 @@
         </div>
 
         <div>
-          <h4 class="font-bold text-sm text-white mb-2">Logs & Prontuários da Consulta (.ZIP)</h4>
+          <h4 class="font-bold text-sm text-white mb-2">Logs & Prontuários (.ZIP)</h4>
           <div id="admin-lista-logs" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- MOTOR WEBRTC UNIFICADO -->
+  <!-- MOTOR WEBRTC MOTOR UNIFICADO E CONTROLES -->
   <script>
     const socket = io();
     let localStream = null;
@@ -316,6 +332,8 @@
     let targetSocketId = null;
     let medicoLogado = null;
     let pendingCandidates = [];
+    let isAudioMuted = false;
+    let isVideoOff = false;
 
     const rtcConfig = {
       iceServers: [
@@ -388,13 +406,19 @@
       }).then(r => r.json()).then(res => {
         if (res.success) {
           medicoLogado = res.medico;
-          document.getElementById('medico-auth-container').classList.add('hidden');
-          document.getElementById('medico-dashboard').classList.remove('hidden');
-          document.getElementById('medico-logado-nome').innerText = medicoLogado.nome;
-          document.getElementById('medico-logado-crm').innerText = 'CRM: ' + medicoLogado.crm;
+          exibirDashboardMedico();
           socket.emit('medico-online', medicoLogado);
         } else { alert(res.error || 'Erro ao entrar'); }
       });
+    }
+
+    function exibirDashboardMedico() {
+      esconderTelas();
+      document.getElementById('screen-medico').classList.remove('hidden');
+      document.getElementById('medico-auth-container').classList.add('hidden');
+      document.getElementById('medico-dashboard').classList.remove('hidden');
+      document.getElementById('medico-logado-nome').innerText = medicoLogado.nome;
+      document.getElementById('medico-logado-crm').innerText = 'CRM: ' + medicoLogado.crm;
     }
 
     function fazerCadastroMedico(e) {
@@ -458,6 +482,7 @@
         document.getElementById('box-anamnese').classList.remove('hidden');
         document.getElementById('btn-upload-chat').classList.remove('hidden');
       } else {
+        document.getElementById('box-anamnese').classList.add('hidden');
         document.getElementById('btn-upload-chat').classList.add('hidden');
       }
 
@@ -539,6 +564,30 @@
       }
     });
 
+    // MUTE / UNMUTE ÁUDIO E CÂMERA
+    function toggleAudio() {
+      if (!localStream) return;
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        isAudioMuted = !isAudioMuted;
+        audioTrack.enabled = !isAudioMuted;
+        const icon = document.getElementById('icon-audio');
+        icon.className = isAudioMuted ? "fa-solid fa-microphone-slash text-red-400" : "fa-solid fa-microphone text-white";
+      }
+    }
+
+    function toggleVideo() {
+      if (!localStream) return;
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        isVideoOff = !isVideoOff;
+        videoTrack.enabled = !isVideoOff;
+        const icon = document.getElementById('icon-video');
+        icon.className = isVideoOff ? "fa-solid fa-video-slash text-red-400" : "fa-solid fa-video text-white";
+      }
+    }
+
+    // CHAT E MENSAGENS
     function enviarMensagemChat() {
       const input = document.getElementById('chat-input');
       const msg = input.value.trim();
@@ -575,23 +624,57 @@
         .then(res => {
           if (res.filename) {
             socket.emit('novo-arquivo-enviado', { file: res, targetId: targetSocketId });
-            adicionarMensagemChat(medicoLogado ? medicoLogado.nome : 'Paciente', `📄 Receita/Atestado: <a href="${res.path}" target="_blank" class="text-cyan-400 underline">${res.originalname}</a>`, true);
+            adicionarMensagemChat(medicoLogado ? medicoLogado.nome : 'Paciente', `📄 Receita/Atestado: <a href="${res.path}" target="_blank" class="text-cyan-400 underline font-bold">${res.originalname}</a>`, true);
           }
         });
     }
 
     socket.on('receber-arquivo-medico', (file) => {
-      adicionarMensagemChat('Dr. Plantonista', `📄 Receita/Atestado Enviado: <a href="${file.path}" target="_blank" class="text-cyan-400 font-bold underline">${file.originalname}</a>`, false);
+      adicionarMensagemChat('Dr. Plantonista', `📄 Receita/Atestado Recebido: <a href="${file.path}" target="_blank" class="text-cyan-400 font-bold underline">${file.originalname}</a>`, false);
     });
 
+    // FINALIZAR E VOLTAR PARA A FILA SEM REINICIAR/LOGOUT DO MÉDICO
     function encerrarConsulta() {
-      const anamnese = document.getElementById('anamnese-texto') ? document.getElementById('anamnese-texto').value : '';
+      const anamneseEl = document.getElementById('anamnese-texto');
+      const anamnese = anamneseEl ? anamneseEl.value : '';
+      
       socket.emit('finalizar-consulta', { anamnese });
-      location.reload();
+      limparEstadoConsulta();
+
+      if (medicoLogado) {
+        exibirDashboardMedico();
+      } else {
+        location.reload();
+      }
     }
 
-    socket.on('consulta-encerrada', () => location.reload());
+    socket.on('consulta-encerrada', () => {
+      limparEstadoConsulta();
+      if (medicoLogado) {
+        exibirDashboardMedico();
+      } else {
+        location.reload();
+      }
+    });
 
+    function limparEstadoConsulta() {
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      targetSocketId = null;
+      pendingCandidates = [];
+      const remoteVideo = document.getElementById('remote-video');
+      if (remoteVideo) remoteVideo.srcObject = null;
+      const localVideo = document.getElementById('local-video');
+      if (localVideo) localVideo.srcObject = null;
+    }
+
+    // PAINEL ADMIN
     function abrirModalAdmin() { document.getElementById('modal-admin').classList.remove('hidden'); }
     function fecharModalAdmin() { document.getElementById('modal-admin').classList.add('hidden'); }
 
