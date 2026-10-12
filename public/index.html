@@ -66,7 +66,7 @@
       </div>
     </div>
 
-    <!-- TELA PACIENTE -->
+    <!-- TELA PACIENTE (FICHA COM NOME, CPF, TELEFONE E ENDEREÇO - SEM SINTOMAS) -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
       <div id="paciente-form-container" class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -77,13 +77,19 @@
             <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
             <input type="text" id="paciente-nome" required placeholder="Digite seu nome completo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">CPF</label>
-            <input type="text" id="paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">CPF</label>
+              <input type="text" id="paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Telefone / WhatsApp</label>
+              <input type="text" id="paciente-telefone" required placeholder="(85) 90000-0000" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+            </div>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Sintomas / Observação Inicial</label>
-            <textarea id="paciente-sintomas" rows="2" placeholder="Descreva brevemente o que está sentindo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></textarea>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Endereço Completo</label>
+            <input type="text" id="paciente-endereco" required placeholder="Rua, Número, Bairro" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
           </div>
           <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-700/50 text-xs text-slate-400 flex items-start gap-2">
             <input type="checkbox" id="check-lgpd" required class="mt-0.5 rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0">
@@ -190,22 +196,60 @@
       </div>
     </div>
 
-    <!-- TELA SALA DE VÍDEO (WEBRTC CROSS-PLATFORM) -->
-    <div id="screen-room" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col">
-      <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
-          <span class="text-xs font-bold text-slate-200">Consulta ao Vivo</span>
+    <!-- TELA SALA DE VÍDEO -->
+    <div id="screen-room" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col md:flex-row">
+      <div class="flex-1 relative bg-black flex flex-col h-full overflow-hidden">
+        <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+            <span class="text-xs font-bold text-slate-200">Consulta ao Vivo</span>
+          </div>
+          <button onclick="encerrarConsulta()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold text-white transition shadow">
+            <i class="fa-solid fa-phone-slash mr-1"></i> Encerrar
+          </button>
         </div>
-        <button onclick="encerrarConsulta()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-bold text-white transition shadow">
-          <i class="fa-solid fa-phone-slash mr-1"></i> Encerrar Consulta
-        </button>
+
+        <div class="flex-1 relative flex items-center justify-center overflow-hidden">
+          <video id="remote-video" autoplay playsinline webkit-playsinline class="w-full h-full object-cover"></video>
+          <div class="absolute bottom-4 right-4 w-28 h-40 sm:w-36 sm:h-52 bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl z-20">
+            <video id="local-video" autoplay muted playsinline webkit-playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+          </div>
+        </div>
       </div>
 
-      <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-        <video id="remote-video" autoplay playsinline webkit-playsinline class="w-full h-full object-cover"></video>
-        <div class="absolute bottom-4 right-4 w-28 h-40 sm:w-36 sm:h-52 bg-slate-900 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl z-20">
-          <video id="local-video" autoplay muted playsinline webkit-playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+      <!-- LADO DIREITO: CHAT & ANAMNESE (DIFERENCIADO MÉDICO VS PACIENTE) -->
+      <div class="w-full md:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full z-30">
+        <!-- ANAMNESE APENAS PARA O MÉDICO -->
+        <div id="box-anamnese" class="hidden p-4 border-b border-slate-800 bg-slate-900/90">
+          <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-notes-medical"></i> Anamnese e Prontuário
+          </h4>
+          <textarea id="anamnese-texto" rows="3" placeholder="Digite o prontuário e prescrição do paciente..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500"></textarea>
+        </div>
+
+        <!-- CHAT DA CONSULTA -->
+        <div class="flex-1 flex flex-col p-4 overflow-hidden">
+          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-comments"></i> Mensagens & Receitas
+          </h4>
+          
+          <div id="chat-messages" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto space-y-2 text-xs">
+            <p class="text-[10px] text-slate-500 text-center">Atendimento conectado com segurança.</p>
+          </div>
+
+          <div class="pt-3 space-y-2">
+            <div class="flex items-center gap-2">
+              <!-- BOTÃO DE ANEXO: VISÍVEL APENAS PARA O MÉDICO (ENVIO DE RECEITAS/ATESTADOS) -->
+              <label id="btn-upload-chat" for="chat-file-input" class="hidden p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white cursor-pointer transition">
+                <i class="fa-solid fa-paperclip"></i>
+              </label>
+              <input type="file" id="chat-file-input" onchange="enviarArquivoChat(event)" class="hidden">
+              <input type="text" id="chat-input" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter') enviarMensagemChat()" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+              <button onclick="enviarMensagemChat()" class="p-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition">
+                <i class="fa-solid fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -219,7 +263,7 @@
       </div>
       <div>
         <h3 class="text-xl font-bold text-white">Chamada Médica</h3>
-        <p class="text-xs text-slate-400 mt-2">Clique no botão para autorizar câmera/microfone e entrar na consulta.</p>
+        <p class="text-xs text-slate-400 mt-2">Toque para aceitar e iniciar o atendimento com vídeo.</p>
       </div>
       <button onclick="aceitarChamadaTouch()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white text-sm shadow-lg transition">
         ATENDER CONSULTA AGORA
@@ -227,18 +271,20 @@
     </div>
   </div>
 
-  <!-- MODAL ADMIN -->
+  <!-- MODAL ADMIN COMPLETO COM TODAS AS AÇÕES E LOGS -->
   <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950/80 bg-blur z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 my-8">
       <div class="flex items-center justify-between pb-3 border-b border-slate-700">
         <h3 class="font-bold text-lg text-white">Painel Gestor</h3>
         <button onclick="fecharModalAdmin()" class="text-slate-400 hover:text-white text-xl">&times;</button>
       </div>
+      
       <div id="admin-login-sec" class="space-y-4 max-w-sm mx-auto py-4">
         <input type="text" id="admin-user" placeholder="Usuário" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
         <input type="password" id="admin-pass" placeholder="Senha" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
         <button onclick="autenticarAdmin()" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white">Entrar</button>
       </div>
+
       <div id="admin-content-sec" class="hidden space-y-6">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Hoje</span><span id="stat-hoje" class="text-2xl font-black text-cyan-400">0</span></div>
@@ -246,29 +292,40 @@
           <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Ano</span><span id="stat-ano" class="text-2xl font-black text-purple-400">0</span></div>
           <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Total</span><span id="stat-total" class="text-2xl font-black text-amber-400">0</span></div>
         </div>
+
         <button onclick="zerarEstatisticasAdmin()" class="px-3 py-1.5 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold">Zerar Contadores</button>
-        <div id="admin-lista-medicos" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
+
+        <div>
+          <h4 class="font-bold text-sm text-white mb-2">Aprovação e Controle de Médicos</h4>
+          <div id="admin-lista-medicos" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-sm text-white mb-2">Logs & Prontuários da Consulta (.ZIP)</h4>
+          <div id="admin-lista-logs" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- SCRIPT FRONTEND WEBRTC COMPLETO -->
+  <!-- MOTOR WEBRTC UNIFICADO -->
   <script>
     const socket = io();
     let localStream = null;
     let peerConnection = null;
     let targetSocketId = null;
     let medicoLogado = null;
-    let chamandoDados = null;
+    let pendingCandidates = [];
 
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" }
       ]
     };
 
-    // NAVEGAÇÃO DE TELAS
     function esconderTelas() {
       ['screen-landing', 'screen-paciente', 'screen-medico', 'screen-room'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
@@ -296,7 +353,6 @@
       }
     }
 
-    // TENANT INFO DYN
     fetch('/api/tenant/info')
       .then(res => res.json())
       .then(t => {
@@ -306,23 +362,20 @@
         if (t.logo) document.getElementById('tenant-logo').src = t.logo;
       }).catch(console.error);
 
-    // PACIENTE
     function entrarFilaPaciente(e) {
       e.preventDefault();
       const nome = document.getElementById('paciente-nome').value;
       const cpf = document.getElementById('paciente-cpf').value;
-      const sintomas = document.getElementById('paciente-sintomas').value;
+      const telefone = document.getElementById('paciente-telefone').value;
+      const endereco = document.getElementById('paciente-endereco').value;
 
-      socket.emit('entrar-fila', { nome, cpf, sintomas });
+      socket.emit('entrar-fila', { nome, cpf, telefone, endereco });
       document.getElementById('paciente-form-container').classList.add('hidden');
       document.getElementById('paciente-espera-container').classList.remove('hidden');
     }
 
-    function cancelarAtendimentoPaciente() {
-      location.reload();
-    }
+    function cancelarAtendimentoPaciente() { location.reload(); }
 
-    // MÉDICO
     function fazerLoginMedico(e) {
       e.preventDefault();
       const cpf = document.getElementById('login-medico-cpf').value;
@@ -364,7 +417,6 @@
 
     function logoutMedico() { location.reload(); }
 
-    // FILA ATUALIZAÇÃO
     socket.on('atualizar-fila', (fila) => {
       const container = document.getElementById('medico-lista-pacientes');
       document.getElementById('medico-fila-count').innerText = fila.length;
@@ -378,7 +430,7 @@
         <div class="p-3 bg-slate-900 border border-slate-700 rounded-xl flex items-center justify-between gap-2">
           <div>
             <span class="font-bold text-xs text-white block">${p.nome}</span>
-            <span class="text-[10px] text-slate-400">CPF: ${p.cpf}</span>
+            <span class="text-[10px] text-slate-400">Tel: ${p.telefone || 'N/I'}</span>
           </div>
           <button onclick="chamarPaciente('${p.id}')" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition">Chamar</button>
         </div>
@@ -391,7 +443,6 @@
       iniciarConsulta();
     }
 
-    // WEBRTC VIDEO ENGINE
     async function iniciarMidiaLocal() {
       if (!localStream) {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -402,17 +453,27 @@
     async function iniciarConsulta() {
       esconderTelas();
       document.getElementById('screen-room').classList.remove('hidden');
+      
+      if (medicoLogado) {
+        document.getElementById('box-anamnese').classList.remove('hidden');
+        document.getElementById('btn-upload-chat').classList.remove('hidden');
+      } else {
+        document.getElementById('btn-upload-chat').classList.add('hidden');
+      }
+
       await iniciarMidiaLocal();
       criarPeerConnection();
     }
 
     function criarPeerConnection() {
       peerConnection = new RTCPeerConnection(rtcConfig);
-
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
       peerConnection.ontrack = (event) => {
-        document.getElementById('remote-video').srcObject = event.streams[0];
+        const remoteVideo = document.getElementById('remote-video');
+        if (remoteVideo.srcObject !== event.streams[0]) {
+          remoteVideo.srcObject = event.streams[0];
+        }
       };
 
       peerConnection.onicecandidate = (event) => {
@@ -420,18 +481,9 @@
           socket.emit('webrtc-candidate', { candidate: event.candidate, targetId: targetSocketId });
         }
       };
-
-      if (medicoLogado) {
-        peerConnection.onnegotiationneeded = async () => {
-          const offer = await peerConnection.createOffer();
-          await peerConnection.setLocalDescription(offer);
-          socket.emit('webrtc-offer', { offer, targetId: targetSocketId });
-        };
-      }
     }
 
     socket.on('chamado-para-consulta', (dados) => {
-      chamandoDados = dados;
       targetSocketId = dados.medicoSocketId;
       document.getElementById('modal-chamada').classList.remove('hidden');
     });
@@ -453,30 +505,93 @@
     socket.on('webrtc-offer', async (data) => {
       targetSocketId = data.senderId;
       if (!peerConnection) await iniciarConsulta();
+
+      if (peerConnection.signalingState !== "stable") return;
+
       await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+      while (pendingCandidates.length) {
+        const cand = pendingCandidates.shift();
+        await peerConnection.addIceCandidate(cand);
+      }
+
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       socket.emit('webrtc-answer', { answer, targetId: targetSocketId });
     });
 
     socket.on('webrtc-answer', async (data) => {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-    });
-
-    socket.on('webrtc-candidate', async (data) => {
-      if (peerConnection) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      if (peerConnection && peerConnection.signalingState === "have-local-offer") {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        while (pendingCandidates.length) {
+          const cand = pendingCandidates.shift();
+          await peerConnection.addIceCandidate(cand);
+        }
       }
     });
 
+    socket.on('webrtc-candidate', async (data) => {
+      const candidate = new RTCIceCandidate(data.candidate);
+      if (peerConnection && peerConnection.remoteDescription) {
+        await peerConnection.addIceCandidate(candidate);
+      } else {
+        pendingCandidates.push(candidate);
+      }
+    });
+
+    function enviarMensagemChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const sender = medicoLogado ? medicoLogado.nome : 'Paciente';
+      socket.emit('enviar-mensagem-chat', { sender, msg, targetId: targetSocketId });
+      adicionarMensagemChat(sender, msg, true);
+      input.value = '';
+    }
+
+    socket.on('receber-mensagem-chat', (data) => {
+      adicionarMensagemChat(data.sender, data.msg, false);
+    });
+
+    function adicionarMensagemChat(sender, msg, isMe) {
+      const box = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `p-2 rounded-lg max-w-[85%] ${isMe ? 'bg-cyan-600/30 ml-auto text-right border border-cyan-500/30' : 'bg-slate-800 mr-auto text-left border border-slate-700'}`;
+      div.innerHTML = `<span class="block text-[10px] text-slate-400 font-bold">${sender}</span><span class="text-xs text-white">${msg}</span>`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function enviarArquivoChat(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('arquivo', file);
+
+      fetch('/api/upload', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+          if (res.filename) {
+            socket.emit('novo-arquivo-enviado', { file: res, targetId: targetSocketId });
+            adicionarMensagemChat(medicoLogado ? medicoLogado.nome : 'Paciente', `📄 Receita/Atestado: <a href="${res.path}" target="_blank" class="text-cyan-400 underline">${res.originalname}</a>`, true);
+          }
+        });
+    }
+
+    socket.on('receber-arquivo-medico', (file) => {
+      adicionarMensagemChat('Dr. Plantonista', `📄 Receita/Atestado Enviado: <a href="${file.path}" target="_blank" class="text-cyan-400 font-bold underline">${file.originalname}</a>`, false);
+    });
+
     function encerrarConsulta() {
-      socket.emit('finalizar-consulta');
+      const anamnese = document.getElementById('anamnese-texto') ? document.getElementById('anamnese-texto').value : '';
+      socket.emit('finalizar-consulta', { anamnese });
       location.reload();
     }
 
     socket.on('consulta-encerrada', () => location.reload());
 
-    // ADMIN MODAL
     function abrirModalAdmin() { document.getElementById('modal-admin').classList.remove('hidden'); }
     function fecharModalAdmin() { document.getElementById('modal-admin').classList.add('hidden'); }
 
@@ -505,19 +620,41 @@
         document.getElementById('stat-total').innerText = d.totalGeralAcessos || 0;
 
         document.getElementById('admin-lista-medicos').innerHTML = (d.medicos || []).map(m => `
-          <div class="flex items-center justify-between text-xs text-slate-300 py-1 border-b border-slate-800">
-            <span>${m.nome} (CRM: ${m.crm}) - <strong class="text-amber-400">${m.statusCadastro}</strong></span>
-            ${m.statusCadastro === 'pendente' ? `<button onclick="aprovarMedico('${m.id}')" class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded">Aprovar</button>` : ''}
+          <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
+            <div>
+              <span class="font-bold text-white">${m.nome}</span> (CRM: ${m.crm}) - <strong class="text-amber-400">${m.statusCadastro}</strong>
+            </div>
+            <div class="flex gap-1">
+              ${m.statusCadastro !== 'aprovado' ? `<button onclick="alterarStatusMedico('${m.id}', 'aprovado')" class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded hover:bg-emerald-500">Aprovar</button>` : ''}
+              ${m.statusCadastro !== 'bloqueado' ? `<button onclick="alterarStatusMedico('${m.id}', 'bloqueado')" class="px-2 py-0.5 bg-amber-600 text-white font-bold rounded hover:bg-amber-500">Bloquear</button>` : ''}
+              <button onclick="alterarStatusMedico('${m.id}', 'negado')" class="px-2 py-0.5 bg-slate-700 text-slate-200 font-bold rounded hover:bg-slate-600">Negar</button>
+              <button onclick="excluirMedico('${m.id}')" class="px-2 py-0.5 bg-red-600 text-white font-bold rounded hover:bg-red-500">Excluir</button>
+            </div>
           </div>
-        `).join('') || '<p class="text-xs text-slate-500">Nenhum médico.</p>';
+        `).join('') || '<p class="text-xs text-slate-500">Nenhum médico cadastrado.</p>';
+
+        document.getElementById('admin-lista-logs').innerHTML = (d.logsConsultas || []).map(l => `
+          <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
+            <span><strong>${l.paciente}</strong> com ${l.medico} em ${l.data}</span>
+            <a href="${l.zipUrl}" class="px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded">Baixar .ZIP</a>
+          </div>
+        `).join('') || '<p class="text-xs text-slate-500">Nenhum log gravado.</p>';
       });
     }
 
-    function aprovarMedico(medicoId) {
+    function alterarStatusMedico(medicoId, novoStatus) {
       fetch('/api/admin/medico/status', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ medicoId, novoStatus: 'aprovado' })
+        body: JSON.stringify({ medicoId, novoStatus })
+      }).then(() => carregarDadosAdmin());
+    }
+
+    function excluirMedico(medicoId) {
+      fetch('/api/admin/medico/excluir', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ medicoId })
       }).then(() => carregarDadosAdmin());
     }
 
