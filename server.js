@@ -87,7 +87,6 @@ function carregarStats(tenantId) {
     totalGeralAcessos: 0, 
     perfis: { medicos: 0, pacientes: 0, geral: 0 },
     historicoDiario: {}, 
-    historicoSemanal: {},
     historicoMensal: {},
     historicoAnual: {}
   };
@@ -104,24 +103,9 @@ function salvarStats(tenantId, stats) {
 
 function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
   const stats = carregarStats(tenantKey);
-  const agora = new Date();
-  
-  const dataHoje = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
-  const mesAno = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
-  const anoAtual = `${agora.getFullYear()}`;
-
   if (!stats.perfis) stats.perfis = { medicos: 0, pacientes: 0, geral: 0 };
-  if (!stats.historicoDiario) stats.historicoDiario = {};
-  if (!stats.historicoMensal) stats.historicoMensal = {};
-  if (!stats.historicoAnual) stats.historicoAnual = {};
-
   stats.totalGeralAcessos = (stats.totalGeralAcessos || 0) + 1;
   stats.perfis[tipoPerfil] = (stats.perfis[tipoPerfil] || 0) + 1;
-
-  stats.historicoDiario[dataHoje] = (stats.historicoDiario[dataHoje] || 0) + 1;
-  stats.historicoMensal[mesAno] = (stats.historicoMensal[mesAno] || 0) + 1;
-  stats.historicoAnual[anoAtual] = (stats.historicoAnual[anoAtual] || 0) + 1;
-
   salvarStats(tenantKey, stats);
 }
 
@@ -152,6 +136,7 @@ function obterMedicosComStatus(tenantId) {
     cpf: m.cpf,
     email: m.email,
     statusCadastro: m.status,
+    atendimentosConcluidos: m.atendimentosConcluidos || 0,
     isOnline: cpfsOnline.has(m.cpf)
   }));
 }
@@ -207,7 +192,7 @@ app.post('/api/medico/cadastro', (req, res) => {
   if (!nome || !cpf || !crm || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
   if (medicos.find(m => m.cpf === cpf)) return res.status(400).json({ error: 'CPF já cadastrado.' });
 
-  const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente' };
+  const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente', atendimentosConcluidos: 0 };
   medicos.push(novoMedico);
   salvarMedicos(key, medicos);
 
@@ -227,7 +212,17 @@ app.post('/api/medico/login', (req, res) => {
 
   registrarAcessoAvancado(key, 'medicos');
 
-  res.json({ success: true, medico: { id: medico.id, nome: medico.nome, crm: medico.crm, cpf: medico.cpf, tenantKey: key } });
+  res.json({ 
+    success: true, 
+    medico: { 
+      id: medico.id, 
+      nome: medico.nome, 
+      crm: medico.crm, 
+      cpf: medico.cpf, 
+      atendimentosConcluidos: medico.atendimentosConcluidos || 0,
+      tenantKey: key 
+    } 
+  });
 });
 
 app.post('/api/admin/login', (req, res) => {
@@ -310,10 +305,21 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
     const stats = carregarStats(tenantKey);
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
+    // Incrementa contagem real de chamadas concluídas
     stats.historicoDiario[dh.data] = (stats.historicoDiario[dh.data] || 0) + 1;
     stats.historicoMensal[dh.mesAno] = (stats.historicoMensal[dh.mesAno] || 0) + 1;
     stats.historicoAnual[dh.ano] = (stats.historicoAnual[dh.ano] || 0) + 1;
     salvarStats(tenantKey, stats);
+
+    // Incrementa o contador individual do médico
+    if (medico && medico.cpf) {
+      const medicos = carregarMedicos(tenantKey);
+      const mObj = medicos.find(m => m.cpf === medico.cpf);
+      if (mObj) {
+        mObj.atendimentosConcluidos = (mObj.atendimentosConcluidos || 0) + 1;
+        salvarMedicos(tenantKey, medicos);
+      }
+    }
 
     const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
     const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
@@ -327,7 +333,8 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
     doc.moveDown();
     doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
     doc.text(`Médico: ${medico?.nome || 'Dr. Plantonista'} (CRM: ${medico?.crm || 'N/A'})`);
-    doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/A'}`);
+    doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/A'} | Nascimento: ${paciente?.dataNascimento || 'N/I'}`);
+    doc.text(`Telefone: ${paciente?.telefone || 'N/I'} | Endereço: ${paciente?.endereco || 'N/I'}`);
     doc.text(`Consentimento LGPD: Aceito em ${paciente?.dataHoraConsentimento || dh.dataHoraCompleta}`);
     doc.moveDown();
     doc.fontSize(14).text('Ficha Clínico-Anamnese:');
@@ -364,12 +371,11 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
   } catch (err) { console.error('Erro geral ao finalizar:', err); }
 }
 
-// WEBSOCKETS E ISOLAMENTO POR CIDADE (TENANT ROOMS)
+// WEBSOCKETS E SINALIZAÇÃO
 io.on('connection', (socket) => {
   const reqHost = socket.handshake.headers.host || '';
   const tenantKey = reqHost.includes('paracuru') ? 'paracuru' : (reqHost.includes('palmacia') ? 'palmacia' : 'default');
 
-  // Adiciona a conexão à sala exclusiva da cidade
   socket.join(tenantKey);
 
   registrarAcessoAvancado(tenantKey, 'geral');
@@ -402,7 +408,6 @@ io.on('connection', (socket) => {
     filaPacientes.push(paciente);
     registroPacientesGeral.push(paciente);
     
-    // Atualiza a fila apenas para a cidade correspondente
     io.to(tenantKey).emit('atualizar-fila', obterFilaPorTenant(tenantKey));
   });
 
@@ -437,8 +442,12 @@ io.on('connection', (socket) => {
       sender: socket.id,
       sessionId,
       roomId,
-      medicoInfo: dadosConsulta.medico
+      medicoInfo: dadosConsulta.medico,
+      pacienteInfo: dadosConsulta.paciente
     });
+
+    // Envia dados completos do paciente para o médico
+    socket.emit('dados-paciente-atendimento', dadosConsulta.paciente);
   });
 
   socket.on('paciente-pronto-para-oferta', (data) => {

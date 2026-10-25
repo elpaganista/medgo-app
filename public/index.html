@@ -86,30 +86,36 @@
       </div>
     </div>
 
-    <!-- TELA PACIENTE -->
+    <!-- TELA PACIENTE (COM DATA DE NASCIMENTO) -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
       <div id="paciente-form-container" class="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
           <i class="fa-solid fa-clipboard-user text-cyan-500"></i> Ficha do Paciente
         </h3>
-        <form onsubmit="entrarFilaPaciente(event)" class="space-y-4">
+        <form onsubmit="entrarFilaPaciente(event)" class="space-y-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
             <input type="text" id="paciente-nome" required placeholder="Digite seu nome completo" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Data de Nascimento</label>
+              <input type="date" id="paciente-nascimento" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CPF</label>
               <input type="text" id="paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
             </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Telefone / WhatsApp</label>
               <input type="text" id="paciente-telefone" required placeholder="(85) 90000-0000" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
             </div>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Endereço Completo</label>
-            <input type="text" id="paciente-endereco" required placeholder="Rua, Número, Bairro" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Endereço Completo</label>
+              <input type="text" id="paciente-endereco" required placeholder="Rua, Número, Bairro" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
           </div>
           <div class="p-3 bg-slate-100 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-700/50 text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2">
             <input type="checkbox" id="check-lgpd" required class="mt-0.5 rounded bg-slate-200 dark:bg-slate-800 border-slate-400 dark:border-slate-600 text-cyan-500 focus:ring-0">
@@ -132,7 +138,7 @@
       </div>
     </div>
 
-    <!-- TELA MÉDICO -->
+    <!-- TELA MÉDICO (COM CONTADOR INDIVIDUAL) -->
     <div id="screen-medico" class="hidden flex-1 flex flex-col gap-4">
       <div id="medico-auth-container" class="max-w-md w-full mx-auto my-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
         <div class="flex border-b border-slate-200 dark:border-slate-700 mb-4">
@@ -200,9 +206,10 @@
           <div class="pt-3 border-t border-slate-200 dark:border-slate-700 mt-auto flex items-center justify-between">
             <div class="text-xs">
               <span id="medico-logado-nome" class="font-bold text-slate-800 dark:text-slate-200 block">Dr. Médico</span>
-              <span id="medico-logado-crm" class="text-slate-500 dark:text-slate-400">CRM: ---</span>
+              <span id="medico-logado-crm" class="text-slate-500 dark:text-slate-400 block">CRM: ---</span>
+              <span id="medico-logado-atendimentos" class="text-emerald-500 font-bold block mt-0.5">Atendimentos Concluídos: 0</span>
             </div>
-            <button onclick="logoutMedico()" class="text-xs text-red-500 font-semibold px-2 py-1 bg-red-500/10 rounded">Sair</button>
+            <button onclick="logoutMedico()" class="text-xs text-red-500 font-semibold px-2 py-1 bg-red-500/10 rounded self-end">Sair</button>
           </div>
         </div>
 
@@ -216,10 +223,10 @@
       </div>
     </div>
 
-    <!-- TELA SALA DE VÍDEO (LAYOUT MOBILE x DESKTOP) -->
+    <!-- TELA SALA DE VÍDEO -->
     <div id="screen-room" class="hidden fixed inset-0 bg-black z-50 flex flex-col md:flex-row h-full w-full">
       
-      <!-- LADO ESQUERDO/TOPO: VÍDEO PRINCIPAL (60% DA TELA EM MOBILE, 100% EM DESKTOP) -->
+      <!-- VÍDEO (60vh EM MOBILE, 100% EM DESKTOP) -->
       <div class="h-[60vh] md:h-full flex-1 relative bg-black flex flex-col w-full overflow-hidden">
         <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between z-10">
           <div class="flex items-center gap-2">
@@ -250,9 +257,23 @@
         </div>
       </div>
 
-      <!-- LADO DIREITO/INFERIOR: ANAMNESE E DOCUMENTOS -->
-      <div class="h-[40vh] md:h-full w-full md:w-96 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col z-30">
+      <!-- PAINEL DIREITO: DADOS DO PACIENTE + ANAMNESE + DOCUMENTOS -->
+      <div class="h-[40vh] md:h-full w-full md:w-96 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col z-30 overflow-y-auto">
         
+        <!-- CARD EXCLUSIVO DO MÉDICO: DADOS DO PACIENTE EM ATENDIMENTO -->
+        <div id="box-dados-paciente" class="hidden p-4 border-b border-slate-800 bg-slate-950/80">
+          <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-address-card"></i> Identificação do Paciente
+          </h4>
+          <div class="space-y-1 text-xs text-slate-300">
+            <p><strong class="text-white">Nome:</strong> <span id="info-paciente-nome">---</span></p>
+            <p><strong class="text-white">Nascimento:</strong> <span id="info-paciente-nascimento">---</span></p>
+            <p><strong class="text-white">CPF:</strong> <span id="info-paciente-cpf">---</span></p>
+            <p><strong class="text-white">Telefone:</strong> <span id="info-paciente-telefone">---</span></p>
+            <p><strong class="text-white">Endereço:</strong> <span id="info-paciente-endereco">---</span></p>
+          </div>
+        </div>
+
         <!-- EXCLUSIVO PARA O MÉDICO: ANAMNESE -->
         <div id="box-anamnese" class="hidden p-4 border-b border-slate-800 bg-slate-900/90">
           <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -267,11 +288,11 @@
             <i class="fa-solid fa-file-medical"></i> Receitas & Documentos
           </h4>
           
-          <div id="chat-messages" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto space-y-2 text-xs">
+          <div id="chat-messages" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto space-y-2 text-xs min-h-[100px]">
             <p class="text-[10px] text-slate-500 text-center">Os documentos e receitas enviados durante a consulta aparecerão aqui para download.</p>
           </div>
 
-          <!-- ÁREA DE ENVIO: OCULTA PARA PACIENTE, VISÍVEL APENAS PARA O MÉDICO -->
+          <!-- ÁREA DE ENVIO DO MÉDICO -->
           <div id="box-envio-medico" class="hidden pt-3 space-y-2">
             <div class="flex items-center gap-2">
               <label for="chat-file-input" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white cursor-pointer transition flex items-center gap-1 text-xs">
@@ -323,10 +344,10 @@
 
       <div id="admin-content-sec" class="hidden space-y-6">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Hoje</span><span id="stat-hoje" class="text-2xl font-black text-cyan-400">0</span></div>
-          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Mês</span><span id="stat-mes" class="text-2xl font-black text-emerald-400">0</span></div>
-          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Ano</span><span id="stat-ano" class="text-2xl font-black text-purple-400">0</span></div>
-          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Total</span><span id="stat-total" class="text-2xl font-black text-amber-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Consultas Hoje</span><span id="stat-hoje" class="text-2xl font-black text-cyan-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Consultas Mês</span><span id="stat-mes" class="text-2xl font-black text-emerald-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Consultas Ano</span><span id="stat-ano" class="text-2xl font-black text-purple-400">0</span></div>
+          <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl"><span class="text-[10px] text-slate-400 uppercase font-bold block">Total Acessos</span><span id="stat-total" class="text-2xl font-black text-amber-400">0</span></div>
         </div>
 
         <button onclick="zerarEstatisticasAdmin()" class="px-3 py-1.5 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold">Zerar Contadores</button>
@@ -457,11 +478,12 @@
     function entrarFilaPaciente(e) {
       e.preventDefault();
       const nome = document.getElementById('paciente-nome').value;
+      const dataNascimento = document.getElementById('paciente-nascimento').value;
       const cpf = document.getElementById('paciente-cpf').value;
       const telefone = document.getElementById('paciente-telefone').value;
       const endereco = document.getElementById('paciente-endereco').value;
 
-      socket.emit('entrar-fila', { nome, cpf, telefone, endereco });
+      socket.emit('entrar-fila', { nome, dataNascimento, cpf, telefone, endereco });
       document.getElementById('paciente-form-container').classList.add('hidden');
       document.getElementById('paciente-espera-container').classList.remove('hidden');
     }
@@ -493,6 +515,7 @@
       document.getElementById('medico-dashboard').classList.remove('hidden');
       document.getElementById('medico-logado-nome').innerText = medicoLogado.nome;
       document.getElementById('medico-logado-crm').innerText = 'CRM: ' + medicoLogado.crm;
+      document.getElementById('medico-logado-atendimentos').innerText = 'Atendimentos Concluídos: ' + (medicoLogado.atendimentosConcluidos || 0);
     }
 
     function fazerCadastroMedico(e) {
@@ -528,7 +551,8 @@
         <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between gap-2">
           <div>
             <span class="font-bold text-xs text-slate-900 dark:text-white block">${escapeHTML(p.nome)}</span>
-            <span class="text-[10px] text-slate-500 dark:text-slate-400">Tel: ${escapeHTML(p.telefone || 'N/I')}</span>
+            <span class="text-[10px] text-slate-500 dark:text-slate-400 block">CPF: ${escapeHTML(p.cpf || 'N/I')}</span>
+            <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Tel: ${escapeHTML(p.telefone || 'N/I')}</span>
           </div>
           <button onclick="chamarPaciente('${p.id}')" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition">Chamar</button>
         </div>
@@ -547,6 +571,16 @@
       }
       socket.emit('chamar-paciente', { pacienteSocketId, medicoInfo: medicoLogado, roomId: Date.now() });
     }
+
+    socket.on('dados-paciente-atendimento', (paciente) => {
+      if (medicoLogado && paciente) {
+        document.getElementById('info-paciente-nome').innerText = paciente.nome || '---';
+        document.getElementById('info-paciente-nascimento').innerText = paciente.dataNascimento ? new Date(paciente.dataNascimento).toLocaleDateString('pt-BR') : '---';
+        document.getElementById('info-paciente-cpf').innerText = paciente.cpf || '---';
+        document.getElementById('info-paciente-telefone').innerText = paciente.telefone || '---';
+        document.getElementById('info-paciente-endereco').innerText = paciente.endereco || '---';
+      }
+    });
 
     async function iniciarMidiaLocal() {
       if (localStream) return;
@@ -572,9 +606,11 @@
       document.getElementById('screen-room').classList.remove('hidden');
       
       if (medicoLogado) {
+        document.getElementById('box-dados-paciente').classList.remove('hidden');
         document.getElementById('box-anamnese').classList.remove('hidden');
         document.getElementById('box-envio-medico').classList.remove('hidden');
       } else {
+        document.getElementById('box-dados-paciente').classList.add('hidden');
         document.getElementById('box-anamnese').classList.add('hidden');
         document.getElementById('box-envio-medico').classList.add('hidden');
       }
@@ -769,6 +805,9 @@
       limparEstadoConsulta();
 
       if (medicoLogado) {
+        if (medicoLogado.atendimentosConcluidos !== undefined) {
+          medicoLogado.atendimentosConcluidos += 1;
+        }
         exibirDashboardMedico();
       } else {
         location.reload();
@@ -831,7 +870,7 @@
         document.getElementById('admin-lista-medicos').innerHTML = (d.medicos || []).map(m => `
           <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
             <div>
-              <span class="font-bold text-white">${escapeHTML(m.nome)}</span> (CRM: ${m.crm}) - <strong class="text-amber-400">${m.statusCadastro}</strong>
+              <span class="font-bold text-white">${escapeHTML(m.nome)}</span> (CRM: ${m.crm}) - Atendimentos: <strong class="text-emerald-400">${m.atendimentosConcluidos || 0}</strong>
             </div>
             <div class="flex gap-1">
               ${m.statusCadastro !== 'aprovado' ? `<button onclick="alterarStatusMedico('${m.id}', 'aprovado')" class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded hover:bg-emerald-500">Aprovar</button>` : ''}
