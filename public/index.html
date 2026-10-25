@@ -83,60 +83,37 @@
       </div>
     </div>
 
-    <!-- TELA PACIENTE (COM LOGIN, CADASTRO COM E-MAIL/SENHA E RECUPERAÇÃO) -->
-    <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
+    <!-- TELA PACIENTE (PÁGINA INICIAL PADRÃO: CRIAR CONTA + MEU PERFIL + MÉDICOS ONLINE) -->
+    <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6 gap-6">
       
-      <!-- LOGIN PACIENTE -->
-      <div id="paciente-login-container" class="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
-        <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <i class="fa-solid fa-user-injured text-cyan-500"></i> Acesso do Paciente
-        </h3>
-        
-        <form onsubmit="fazerLoginPaciente(event)" class="space-y-3">
+      <!-- HEADER DO PACIENTE LOGADO COM MEU PERFIL -->
+      <div id="paciente-header-logado" class="hidden w-full max-w-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-xl">
+        <div class="flex items-center gap-3">
+          <img id="paciente-logado-foto" src="/images/default-avatar.png" class="w-12 h-12 rounded-full object-cover border-2 border-cyan-500 shadow">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CPF</label>
-            <input type="text" id="login-paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            <h3 id="paciente-logado-nome" class="font-bold text-base text-slate-900 dark:text-white">Paciente</h3>
+            <p id="paciente-logado-cpf" class="text-xs text-slate-500 dark:text-slate-400">CPF: ---</p>
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Senha</label>
-            <input type="password" id="login-paciente-senha" required placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-          </div>
-          
-          <div class="flex items-center justify-between text-xs">
-            <button type="button" onclick="mostrarEsqueciSenha()" class="text-cyan-500 hover:underline">Esqueceu a senha?</button>
-            <button type="button" onclick="mostrarCadastroPaciente()" class="text-slate-400 hover:text-white font-semibold">Criar Conta</button>
-          </div>
-
-          <div class="flex gap-2 pt-2">
-            <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-medium transition text-slate-800 dark:text-white">Voltar</button>
-            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Entrar na Conta</button>
-          </div>
-        </form>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="mudarAbaPaciente('fila')" id="btn-pac-fila" class="px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-bold shadow">Entrar na Fila</button>
+          <button onclick="mudarAbaPaciente('perfil')" id="btn-pac-perfil" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold">Meu Perfil</button>
+          <button onclick="logoutPaciente()" class="px-2.5 py-1.5 bg-red-600/10 text-red-500 rounded-xl text-xs font-bold">Sair</button>
+        </div>
       </div>
 
-      <!-- RECUPERAÇÃO DE SENHA PACIENTE -->
-      <div id="paciente-esqueci-container" class="hidden w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
-        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Recuperar Senha</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Informe seu e-mail cadastrado para receber o link de redefinição de senha.</p>
-        
-        <form onsubmit="recuperarSenhaPaciente(event)" class="space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">E-mail Cadastrado</label>
-            <input type="email" id="rec-paciente-email" required placeholder="seuemail@exemplo.com" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
-          </div>
-          <div class="flex gap-2 pt-2">
-            <button type="button" onclick="mostrarLoginPaciente()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-medium transition text-slate-800 dark:text-white">Voltar</button>
-            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Enviar E-mail</button>
-          </div>
-        </form>
-      </div>
+      <!-- SEÇÃO 1: FORMULÁRIO DE CADASTRO/ENTRADA (PÁGINA INICIAL PADRÃO) -->
+      <div id="paciente-form-container" class="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-700 pb-3">
+          <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <i class="fa-solid fa-user-plus text-cyan-500"></i> Criar Conta / Entrar na Fila
+          </h3>
+          <button type="button" onclick="mostrarLoginPaciente()" class="px-3 py-1 bg-cyan-500/10 text-cyan-500 hover:bg-cyan-500/20 rounded-lg text-xs font-bold border border-cyan-500/30 transition">
+            Já tenho conta (Entrar)
+          </button>
+        </div>
 
-      <!-- FORMULÁRIO DE CADASTRO / ENTRADA NA FILA -->
-      <div id="paciente-form-container" class="hidden w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
-        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <i class="fa-solid fa-clipboard-user text-cyan-500"></i> Ficha do Paciente
-        </h3>
-        <form onsubmit="entrarFilaPaciente(event)" class="space-y-3">
+        <form onsubmit="cadastrarEEntrarFilaPaciente(event)" class="space-y-3" enctype="multipart/form-data">
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
             <input type="text" id="paciente-nome" required placeholder="Digite seu nome completo" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
@@ -160,6 +137,10 @@
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Senha de Acesso</label>
               <input type="password" id="paciente-senha" required placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
             </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Foto de Perfil (Opcional)</label>
+            <input type="file" id="paciente-foto" accept="image/*" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Prioridade / Perfil Atendimento</label>
@@ -186,12 +167,104 @@
             <label for="check-lgpd" class="leading-tight">Aceito os termos do TCLE e o uso dos meus dados para telemedicina (LGPD).</label>
           </div>
           <div class="flex gap-2 pt-2">
-            <button type="button" onclick="mostrarLoginPaciente()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-medium transition text-slate-800 dark:text-white">Já tenho conta</button>
-            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Solicitar Atendimento</button>
+            <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-medium transition text-slate-800 dark:text-white">Voltar</button>
+            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Cadastrar e Entrar na Fila</button>
           </div>
         </form>
       </div>
 
+      <!-- SEÇÃO 2: LOGIN PACIENTE -->
+      <div id="paciente-login-container" class="hidden w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <i class="fa-solid fa-right-to-bracket text-cyan-500"></i> Entrar na Conta do Paciente
+        </h3>
+        
+        <form onsubmit="fazerLoginPaciente(event)" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CPF</label>
+            <input type="text" id="login-paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Senha</label>
+            <input type="password" id="login-paciente-senha" required placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          
+          <div class="flex items-center justify-between text-xs">
+            <button type="button" onclick="mostrarEsqueciSenha()" class="text-cyan-500 hover:underline">Esqueceu a senha?</button>
+            <button type="button" onclick="mostrarCadastroPaciente()" class="text-slate-400 hover:text-white font-semibold">Criar Conta</button>
+          </div>
+
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="voltarParaLanding()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-medium transition text-slate-800 dark:text-white">Voltar</button>
+            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Entrar na Conta</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- SEÇÃO 3: EDITAR PERFIL PACIENTE -->
+      <div id="paciente-perfil-container" class="hidden w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-3 flex items-center gap-2">
+          <i class="fa-solid fa-user-pen text-cyan-500"></i> Editar Meu Perfil
+        </h3>
+        
+        <form onsubmit="salvarPerfilPaciente(event)" class="space-y-3" enctype="multipart/form-data">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
+            <input type="text" id="edit-paciente-nome" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">E-mail</label>
+            <input type="email" id="edit-paciente-email" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Telefone / WhatsApp</label>
+            <input type="text" id="edit-paciente-telefone" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Endereço Completo</label>
+            <input type="text" id="edit-paciente-endereco" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Alterar Foto de Perfil</label>
+            <input type="file" id="edit-paciente-foto" accept="image/*" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nova Senha (opcional)</label>
+            <input type="password" id="edit-paciente-senha" placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <button type="submit" class="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-cyan-600/20">Salvar Alterações</button>
+        </form>
+      </div>
+
+      <!-- RECUPERAÇÃO DE SENHA PACIENTE -->
+      <div id="paciente-esqueci-container" class="hidden w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Recuperar Senha</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Informe seu e-mail cadastrado para receber o link de redefinição de senha.</p>
+        
+        <form onsubmit="recuperarSenhaPaciente(event)" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">E-mail Cadastrado</label>
+            <input type="email" id="rec-paciente-email" required placeholder="seuemail@exemplo.com" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="mostrarLoginPaciente()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-medium transition text-slate-800 dark:text-white">Voltar</button>
+            <button type="submit" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold text-white transition shadow-lg shadow-cyan-600/20">Enviar E-mail</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- PAINEL DE MÉDICOS ONLINE DE PLANTÃO (PARA O PACIENTE) -->
+      <div id="paciente-medicos-online-sec" class="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-xl space-y-3">
+        <h4 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Médicos Plantonistas Online
+        </h4>
+        <div id="paciente-lista-medicos-online" class="space-y-2 max-h-40 overflow-y-auto">
+          <p class="text-xs text-slate-500">Carregando médicos online...</p>
+        </div>
+      </div>
+
+      <!-- TELA DE ESPERA NA FILA -->
       <div id="paciente-espera-container" class="hidden w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center shadow-xl space-y-4">
         <div class="w-16 h-16 rounded-full bg-cyan-500/10 text-cyan-500 flex items-center justify-center text-3xl mx-auto animate-pulse">
           <i class="fa-solid fa-clock"></i>
@@ -202,7 +275,7 @@
       </div>
     </div>
 
-    <!-- TELA MÉDICO (SISTEMA HUB + CONTAGEM INDIVIDUAL DO MÉDICO) -->
+    <!-- TELA MÉDICO (SISTEMA HUB + CONTAGEM INDIVIDUAL DO MÉDICO COM FILTROS) -->
     <div id="screen-medico" class="hidden flex-1 flex flex-col gap-4">
       
       <!-- AUTH LOGIN / CADASTRO -->
@@ -309,27 +382,51 @@
           </div>
         </div>
 
-        <!-- CONTEÚDO HUB 2: DASHBOARD INDIVIDUAL DO MÉDICO -->
+        <!-- CONTEÚDO HUB 2: DASHBOARD INDIVIDUAL DO MÉDICO COM FILTROS DE PERÍODO -->
         <div id="hub-sec-bi" class="hidden flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-6">
-          <div class="border-b border-slate-200 dark:border-slate-700 pb-3">
-            <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <i class="fa-solid fa-user-check text-emerald-500"></i> Minha Produção Individual
-            </h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Seus dados e relatórios de consultas efetuadas</p>
+          <div class="border-b border-slate-200 dark:border-slate-700 pb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-user-check text-emerald-500"></i> Minha Produção Individual
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Seus dados e relatórios de consultas efetuadas</p>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-bold text-slate-400">Filtrar por:</label>
+              <select id="filtro-periodo-medico" onchange="atualizarMetricasMedico()" class="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none">
+                <option value="hoje">Hoje</option>
+                <option value="semana">Esta Semana</option>
+                <option value="mes">Este Mês</option>
+                <option value="ano">Este Ano</option>
+                <option value="todos">Todos</option>
+              </select>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div class="bg-blue-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
-              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Efetuados Hoje</span>
+              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Hoje</span>
               <span id="medico-stat-hoje" class="text-4xl font-black mt-2">0</span>
             </div>
+            <div class="bg-cyan-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
+              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Semana</span>
+              <span id="medico-stat-semana" class="text-4xl font-black mt-2">0</span>
+            </div>
             <div class="bg-emerald-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
-              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Efetuados no Mês</span>
+              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Mês</span>
               <span id="medico-stat-mes" class="text-4xl font-black mt-2">0</span>
             </div>
             <div class="bg-purple-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
-              <span class="text-xs font-bold opacity-80 uppercase">Total Geral de Atendimentos</span>
+              <span class="text-xs font-bold opacity-80 uppercase">Total Geral</span>
               <span id="medico-stat-total" class="text-4xl font-black mt-2">0</span>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="font-bold text-sm text-slate-900 dark:text-white mb-3">Histórico de Pacientes Atendidos</h4>
+            <div id="medico-tabela-atendimentos" class="space-y-2 max-h-60 overflow-y-auto">
+              <p class="text-xs text-slate-500">Nenhum atendimento registrado no período selecionado.</p>
             </div>
           </div>
         </div>
@@ -462,7 +559,7 @@
     </div>
   </div>
 
-  <!-- PAINEL ADMIN DEDICADO TELA CHEIA (TIPO DASHBOARD COMPLETO) -->
+  <!-- PAINEL ADMIN DEDICADO TELA CHEIA -->
   <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col overflow-hidden">
     
     <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
@@ -494,7 +591,6 @@
       <!-- CONTEÚDO ADMIN COMPLETO COM ABAS -->
       <div id="admin-content-sec" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden">
         
-        <!-- SIDEBAR ADMIN -->
         <div class="w-full md:w-64 bg-slate-900/60 border-b md:border-b-0 md:border-r border-slate-800 p-4 space-y-2">
           <button onclick="mudarAbaAdmin('dash')" id="btn-adm-dash" class="w-full p-3 bg-cyan-600 text-white rounded-xl text-xs font-bold text-left flex items-center gap-2 transition">
             <i class="fa-solid fa-chart-pie"></i> Visão Geral & Métricas
@@ -510,33 +606,52 @@
           </button>
         </div>
 
-        <!-- AREA DE CONTEÚDO PRINCIPAL ADMIN -->
         <div class="flex-1 p-6 overflow-y-auto space-y-6 bg-slate-950">
           
-          <!-- ABA 1: METRICAS -->
+          <!-- ABA 1: METRICAS E FILTROS DE ATENDIMENTO COM DATA E HORA -->
           <div id="adm-sec-dash" class="space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span class="text-xs text-slate-400 font-bold block">Consultas Hoje</span><span id="stat-hoje" class="text-3xl font-black text-cyan-400 mt-1 block">0</span></div>
-              <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span class="text-xs text-slate-400 font-bold block">Consultas Mês</span><span id="stat-mes" class="text-3xl font-black text-emerald-400 mt-1 block">0</span></div>
-              <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span class="text-xs text-slate-400 font-bold block">Consultas Ano</span><span id="stat-ano" class="text-3xl font-black text-purple-400 mt-1 block">0</span></div>
-              <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl"><span class="text-xs text-slate-400 font-bold block">Total Acessos</span><span id="stat-total" class="text-3xl font-black text-amber-400 mt-1 block">0</span></div>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <h3 class="text-base font-bold text-white">Relatório Geral de Atendimentos</h3>
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-slate-400">Filtrar por:</label>
+                <select id="filtro-periodo-admin" onchange="carregarDadosAdmin()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none">
+                  <option value="hoje">Hoje</option>
+                  <option value="semana">Esta Semana</option>
+                  <option value="mes">Este Mês</option>
+                  <option value="ano">Este Ano</option>
+                  <option value="todos">Todos</option>
+                </select>
+              </div>
             </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+              <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><span class="text-[10px] text-slate-400 font-bold block uppercase">Hoje</span><span id="stat-hoje" class="text-2xl font-black text-cyan-400 mt-1 block">0</span></div>
+              <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><span class="text-[10px] text-slate-400 font-bold block uppercase">Esta Semana</span><span id="stat-semana" class="text-2xl font-black text-blue-400 mt-1 block">0</span></div>
+              <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><span class="text-[10px] text-slate-400 font-bold block uppercase">Este Mês</span><span id="stat-mes" class="text-2xl font-black text-emerald-400 mt-1 block">0</span></div>
+              <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><span class="text-[10px] text-slate-400 font-bold block uppercase">Este Ano</span><span id="stat-ano" class="text-2xl font-black text-purple-400 mt-1 block">0</span></div>
+              <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><span class="text-[10px] text-slate-400 font-bold block uppercase">Total Acessos</span><span id="stat-total" class="text-2xl font-black text-amber-400 mt-1 block">0</span></div>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-sm text-white mb-3">Histórico Detalhado de Atendimentos Realizados</h4>
+              <div id="admin-tabela-atendimentos" class="space-y-2 max-h-72 overflow-y-auto">
+                <p class="text-xs text-slate-500">Nenhum atendimento no período selecionado.</p>
+              </div>
+            </div>
+
             <button onclick="zerarEstatisticasAdmin()" class="px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold hover:bg-red-600/30 transition">Zerar Estatísticas Globais</button>
           </div>
 
-          <!-- ABA 2: MÉDICOS -->
           <div id="adm-sec-medicos" class="hidden space-y-4">
             <h3 class="text-base font-bold text-white">Credenciamento de Médicos</h3>
             <div id="admin-lista-medicos" class="space-y-2"></div>
           </div>
 
-          <!-- ABA 3: PACIENTES COMPLETA -->
           <div id="adm-sec-pacientes" class="hidden space-y-4">
             <h3 class="text-base font-bold text-white">Pacientes Cadastrados no Município</h3>
             <div id="admin-lista-pacientes" class="space-y-2"></div>
           </div>
 
-          <!-- ABA 4: LOGS -->
           <div id="adm-sec-logs" class="hidden space-y-4">
             <h3 class="text-base font-bold text-white">Histórico de Teleconsultas Finalizadas (.ZIP)</h3>
             <div id="admin-lista-logs" class="space-y-2"></div>
@@ -609,9 +724,7 @@
         const res = await fetch('/api/ice-config');
         const cfg = await res.json();
         if (cfg && cfg.iceServers && cfg.iceServers.length) rtcConfig = cfg;
-      } catch (e) {
-        console.error('Erro ao obter ice-config:', e);
-      }
+      } catch (e) { console.error('Erro ice-config:', e); }
     }
     atualizarIceConfig();
 
@@ -625,11 +738,9 @@
     }
 
     function mensagemErroMidia(err) {
-      if (err && err.message === 'SEM_HTTPS') return 'Câmera/microfone só funcionam em página segura (HTTPS). Acesse o site pelo endereço https://.';
-      if (err && err.name === 'NotAllowedError') return 'Permissão negada. Libere câmera e microfone no navegador e tente de novo.';
-      if (err && err.name === 'NotFoundError') return 'Nenhuma câmera/microfone encontrado neste aparelho.';
-      if (err && err.name === 'NotReadableError') return 'Câmera/microfone em uso por outro app. Feche-o e tente de novo.';
-      return 'Não foi possível acessar câmera e microfone: ' + (err && err.message ? err.message : err);
+      if (err && err.message === 'SEM_HTTPS') return 'Câmera/microfone só funcionam em HTTPS.';
+      if (err && err.name === 'NotAllowedError') return 'Permissão negada. Libere a câmera/microfone.';
+      return 'Erro ao acessar mídia: ' + (err && err.message ? err.message : err);
     }
 
     function esconderTelas() {
@@ -642,7 +753,7 @@
       esconderTelas();
       if (perfil === 'paciente') {
         document.getElementById('screen-paciente').classList.remove('hidden');
-        mostrarLoginPaciente();
+        mostrarCadastroPaciente();
       }
       if (perfil === 'medico') document.getElementById('screen-medico').classList.remove('hidden');
     }
@@ -653,21 +764,107 @@
     }
 
     function mostrarLoginPaciente() {
-      document.getElementById('paciente-login-container').classList.remove('hidden');
-      document.getElementById('paciente-esqueci-container').classList.add('hidden');
       document.getElementById('paciente-form-container').classList.add('hidden');
+      document.getElementById('paciente-perfil-container').classList.add('hidden');
+      document.getElementById('paciente-esqueci-container').classList.add('hidden');
+      document.getElementById('paciente-login-container').classList.remove('hidden');
     }
 
     function mostrarCadastroPaciente() {
       document.getElementById('paciente-login-container').classList.add('hidden');
+      document.getElementById('paciente-perfil-container').classList.add('hidden');
       document.getElementById('paciente-esqueci-container').classList.add('hidden');
       document.getElementById('paciente-form-container').classList.remove('hidden');
     }
 
     function mostrarEsqueciSenha() {
       document.getElementById('paciente-login-container').classList.add('hidden');
-      document.getElementById('paciente-esqueci-container').classList.remove('hidden');
       document.getElementById('paciente-form-container').classList.add('hidden');
+      document.getElementById('paciente-perfil-container').classList.add('hidden');
+      document.getElementById('paciente-esqueci-container').classList.remove('hidden');
+    }
+
+    function mudarAbaPaciente(aba) {
+      if (aba === 'fila') {
+        document.getElementById('paciente-perfil-container').classList.add('hidden');
+        document.getElementById('paciente-form-container').classList.remove('hidden');
+        document.getElementById('btn-pac-fila').className = "px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-bold shadow";
+        document.getElementById('btn-pac-perfil').className = "px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold";
+      } else if (aba === 'perfil') {
+        document.getElementById('paciente-form-container').classList.add('hidden');
+        document.getElementById('paciente-perfil-container').classList.remove('hidden');
+        document.getElementById('btn-pac-fila').className = "px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold";
+        document.getElementById('btn-pac-perfil').className = "px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-bold shadow";
+        
+        if (pacienteLogado) {
+          document.getElementById('edit-paciente-nome').value = pacienteLogado.nome;
+          document.getElementById('edit-paciente-email').value = pacienteLogado.email;
+          document.getElementById('edit-paciente-telefone').value = pacienteLogado.telefone || '';
+          document.getElementById('edit-paciente-endereco').value = pacienteLogado.endereco || '';
+        }
+      }
+    }
+
+    function cadastrarEEntrarFilaPaciente(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      const nome = document.getElementById('paciente-nome').value;
+      const cpf = document.getElementById('paciente-cpf').value;
+      const email = document.getElementById('paciente-email').value;
+      const senha = document.getElementById('paciente-senha').value;
+      const dataNascimento = document.getElementById('paciente-nascimento').value;
+      const telefone = document.getElementById('paciente-telefone').value;
+      const endereco = document.getElementById('paciente-endereco').value;
+      const prioridade = document.getElementById('paciente-prioridade').value;
+
+      formData.append('nome', nome);
+      formData.append('cpf', cpf);
+      formData.append('email', email);
+      formData.append('senha', senha);
+      formData.append('dataNascimento', dataNascimento);
+      formData.append('telefone', telefone);
+      formData.append('endereco', endereco);
+
+      const foto = document.getElementById('paciente-foto').files[0];
+      if (foto) formData.append('fotoPerfil', foto);
+
+      fetch('/api/paciente/cadastro', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            pacienteLogado = res.paciente;
+            socket.emit('entrar-fila', { nome, dataNascimento, cpf, email, senha, telefone, endereco, prioridade, foto: res.paciente.foto });
+            document.getElementById('paciente-form-container').classList.add('hidden');
+            document.getElementById('paciente-espera-container').classList.remove('hidden');
+          } else { alert(res.error || 'Erro no cadastro'); }
+        });
+    }
+
+    function salvarPerfilPaciente(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append('id', pacienteLogado.id);
+      formData.append('nome', document.getElementById('edit-paciente-nome').value);
+      formData.append('email', document.getElementById('edit-paciente-email').value);
+      formData.append('telefone', document.getElementById('edit-paciente-telefone').value);
+      formData.append('endereco', document.getElementById('edit-paciente-endereco').value);
+      
+      const senha = document.getElementById('edit-paciente-senha').value;
+      if (senha) formData.append('senha', senha);
+
+      const foto = document.getElementById('edit-paciente-foto').files[0];
+      if (foto) formData.append('fotoPerfil', foto);
+
+      fetch('/api/paciente/editar-perfil', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            pacienteLogado = res.paciente;
+            document.getElementById('paciente-logado-nome').innerText = pacienteLogado.nome;
+            document.getElementById('paciente-logado-foto').src = pacienteLogado.foto || '/images/default-avatar.png';
+            alert('Perfil atualizado com sucesso!');
+          } else { alert(res.error || 'Erro ao atualizar.'); }
+        });
     }
 
     function fazerLoginPaciente(e) {
@@ -682,16 +879,24 @@
       }).then(r => r.json()).then(res => {
         if (res.success) {
           pacienteLogado = res.paciente;
+          document.getElementById('paciente-header-logado').classList.remove('hidden');
+          document.getElementById('paciente-logado-nome').innerText = pacienteLogado.nome;
+          document.getElementById('paciente-logado-cpf').innerText = 'CPF: ' + pacienteLogado.cpf;
+          document.getElementById('paciente-logado-foto').src = pacienteLogado.foto || '/images/default-avatar.png';
+          
           document.getElementById('paciente-nome').value = pacienteLogado.nome;
           document.getElementById('paciente-cpf').value = pacienteLogado.cpf;
-          document.getElementById('paciente-nascimento').value = pacienteLogado.dataNascimento;
+          document.getElementById('paciente-nascimento').value = pacienteLogado.dataNascimento || '';
           document.getElementById('paciente-email').value = pacienteLogado.email;
-          document.getElementById('paciente-telefone').value = pacienteLogado.telefone;
-          document.getElementById('paciente-endereco').value = pacienteLogado.endereco;
-          mostrarCadastroPaciente();
+          document.getElementById('paciente-telefone').value = pacienteLogado.telefone || '';
+          document.getElementById('paciente-endereco').value = pacienteLogado.endereco || '';
+          
+          mudarAbaPaciente('fila');
         } else { alert(res.error || 'Erro ao entrar'); }
       });
     }
+
+    function logoutPaciente() { location.reload(); }
 
     function recuperarSenhaPaciente(e) {
       e.preventDefault();
@@ -749,22 +954,6 @@
         if (t.badge) document.getElementById('tenant-badge').innerText = t.badge;
         if (t.logo) document.getElementById('tenant-logo').src = t.logo;
       }).catch(console.error);
-
-    function entrarFilaPaciente(e) {
-      e.preventDefault();
-      const nome = document.getElementById('paciente-nome').value;
-      const dataNascimento = document.getElementById('paciente-nascimento').value;
-      const cpf = document.getElementById('paciente-cpf').value;
-      const email = document.getElementById('paciente-email').value;
-      const senha = document.getElementById('paciente-senha').value;
-      const telefone = document.getElementById('paciente-telefone').value;
-      const endereco = document.getElementById('paciente-endereco').value;
-      const prioridade = document.getElementById('paciente-prioridade').value;
-
-      socket.emit('entrar-fila', { nome, dataNascimento, cpf, email, senha, telefone, endereco, prioridade });
-      document.getElementById('paciente-form-container').classList.add('hidden');
-      document.getElementById('paciente-espera-container').classList.remove('hidden');
-    }
 
     function cancelarAtendimentoPaciente() { location.reload(); }
 
@@ -844,6 +1033,26 @@
 
     function logoutMedico() { location.reload(); }
 
+    socket.on('atualizar-lista-medicos-geral', (lista) => {
+      const medicosOnline = lista.filter(m => m.isOnline);
+      const container = document.getElementById('paciente-lista-medicos-online');
+      if (container) {
+        if (!medicosOnline.length) {
+          container.innerHTML = '<p class="text-xs text-slate-500">Nenhum médico online no momento.</p>';
+        } else {
+          container.innerHTML = medicosOnline.map(m => `
+            <div class="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs">
+              <img src="${m.foto || '/images/default-avatar.png'}" class="w-7 h-7 rounded-full object-cover border border-emerald-500">
+              <div>
+                <span class="font-bold text-slate-900 dark:text-white block">${escapeHTML(m.nome)}</span>
+                <span class="text-[10px] text-slate-500">CRM: ${escapeHTML(m.crm)}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+    });
+
     socket.on('atualizar-fila', (fila) => {
       filaCompletaAtual = fila;
       renderizarFilaMedicos(filaCompletaAtual);
@@ -874,6 +1083,7 @@
           <div class="space-y-1">
             <div class="flex items-center gap-2">
               <span class="font-extrabold text-xs text-slate-900 dark:text-white">${escapeHTML(p.nome)}</span>
+              ${p.isOnline ? '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ONLINE</span>' : '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-slate-500/20 text-slate-400 border border-slate-500/30">OFFLINE</span>'}
               ${p.prioridade && p.prioridade !== 'GERAL' ? `<span class="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30">${p.prioridade}</span>` : ''}
             </div>
             <div class="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
@@ -882,7 +1092,7 @@
               <span>Tel: ${escapeHTML(p.telefone || 'N/I')}</span>
             </div>
           </div>
-          <button onclick="chamarPaciente('${p.id}')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow">Chamar para Consulta</button>
+          ${p.isOnline ? `<button onclick="chamarPaciente('${p.id}')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow">Chamar para Consulta</button>` : `<button disabled class="px-3 py-1.5 bg-slate-700 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed">Paciente Offline</button>`}
         </div>
       `).join('');
     }
@@ -978,11 +1188,10 @@
       peerConnection.oniceconnectionstatechange = () => {
         if (!peerConnection) return;
         const st = peerConnection.iceConnectionState;
-        console.log('ICE state:', st);
         if (st === 'checking') definirStatus('Conectando...');
         if (st === 'connected' || st === 'completed') definirStatus('🟢 Conectado');
         if (st === 'disconnected') definirStatus('⚠️ Conexão instável...');
-        if (st === 'failed') definirStatus('❌ Falha de rede (TURN indisponível?)');
+        if (st === 'failed') definirStatus('❌ Falha de rede');
       };
 
       peerConnection.onicecandidate = (event) => {
@@ -1088,7 +1297,7 @@
     }
 
     socket.on('paciente-indisponivel', () => {
-      alert('Este paciente não está mais na fila.');
+      alert('Este paciente não está mais disponível.');
       limparEstadoConsulta();
       exibirDashboardMedico();
     });
@@ -1135,9 +1344,6 @@
       limparEstadoConsulta();
 
       if (medicoLogado) {
-        if (medicoLogado.atendimentosConcluidos !== undefined) {
-          medicoLogado.atendimentosConcluidos += 1;
-        }
         exibirDashboardMedico();
       } else {
         location.reload();
@@ -1216,20 +1422,87 @@
       if (!medicoLogado) return;
       const agora = new Date();
       const hojeStr = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
+      const primeiroDiaAno = new Date(agora.getFullYear(), 0, 1);
+      const dias = Math.floor((agora - primeiroDiaAno) / (24 * 60 * 60 * 1000));
+      const semanaNum = Math.ceil((agora.getDay() + 1 + dias) / 7);
+      const semanaStr = `Semana ${semanaNum}/${agora.getFullYear()}`;
       const mesStr = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
+      const anoStr = `${agora.getFullYear()}`;
 
-      const hist = medicoLogado.historicoAtendimentos || {};
-      document.getElementById('medico-stat-hoje').innerText = hist[hojeStr] || 0;
-      document.getElementById('medico-stat-mes').innerText = hist[mesStr] || 0;
-      document.getElementById('medico-stat-total').innerText = medicoLogado.atendimentosConcluidos || 0;
+      const list = medicoLogado.historicoAtendimentosList || [];
+
+      const atHoje = list.filter(item => item.data === hojeStr).length;
+      const atSemana = list.filter(item => item.semana === semanaStr).length;
+      const atMes = list.filter(item => item.mes === mesStr).length;
+      const atTotal = medicoLogado.atendimentosConcluidos || list.length;
+
+      document.getElementById('medico-stat-hoje').innerText = atHoje;
+      document.getElementById('medico-stat-semana').innerText = atSemana;
+      document.getElementById('medico-stat-mes').innerText = atMes;
+      document.getElementById('medico-stat-total').innerText = atTotal;
+
+      const filtro = document.getElementById('filtro-periodo-medico')?.value || 'hoje';
+      let filtrados = list;
+
+      if (filtro === 'hoje') filtrados = list.filter(i => i.data === hojeStr);
+      if (filtro === 'semana') filtrados = list.filter(i => i.semana === semanaStr);
+      if (filtro === 'mes') filtrados = list.filter(i => i.mes === mesStr);
+      if (filtro === 'ano') filtrados = list.filter(i => i.ano === anoStr);
+
+      const tabelaContainer = document.getElementById('medico-tabela-atendimentos');
+      if (!filtrados.length) {
+        tabelaContainer.innerHTML = '<p class="text-xs text-slate-500">Nenhum atendimento registrado no período selecionado.</p>';
+      } else {
+        tabelaContainer.innerHTML = filtrados.map(i => `
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl flex items-center justify-between text-xs">
+            <div>
+              <span class="font-bold text-slate-900 dark:text-white block">${escapeHTML(i.pacienteNome)}</span>
+              <span class="text-[10px] text-slate-500">CPF: ${escapeHTML(i.pacienteCpf)}</span>
+            </div>
+            <span class="text-xs font-semibold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">${i.dataHora}</span>
+          </div>
+        `).join('');
+      }
     }
 
     function carregarDadosAdmin() {
       fetch('/api/admin/dados').then(r => r.json()).then(d => {
         document.getElementById('stat-hoje').innerText = d.atendimentosHoje || 0;
+        document.getElementById('stat-semana').innerText = d.atendimentosSemana || 0;
         document.getElementById('stat-mes').innerText = d.atendimentosMes || 0;
         document.getElementById('stat-ano').innerText = d.atendimentosAno || 0;
         document.getElementById('stat-total').innerText = d.totalGeralAcessos || 0;
+
+        const filtro = document.getElementById('filtro-periodo-admin')?.value || 'hoje';
+        const agora = new Date();
+        const hojeStr = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
+        const primeiroDiaAno = new Date(agora.getFullYear(), 0, 1);
+        const dias = Math.floor((agora - primeiroDiaAno) / (24 * 60 * 60 * 1000));
+        const semanaNum = Math.ceil((agora.getDay() + 1 + dias) / 7);
+        const semanaStr = `Semana ${semanaNum}/${agora.getFullYear()}`;
+        const mesStr = `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`;
+        const anoStr = `${agora.getFullYear()}`;
+
+        let logsFiltrados = d.logsConsultas || [];
+        if (filtro === 'hoje') logsFiltrados = logsFiltrados.filter(l => l.dataApenas === hojeStr);
+        if (filtro === 'semana') logsFiltrados = logsFiltrados.filter(l => l.semanaApenas === semanaStr);
+        if (filtro === 'mes') logsFiltrados = logsFiltrados.filter(l => l.mesApenas === mesStr);
+        if (filtro === 'ano') logsFiltrados = logsFiltrados.filter(l => l.anoApenas === anoStr);
+
+        const tabelaAdmin = document.getElementById('admin-tabela-atendimentos');
+        if (!logsFiltrados.length) {
+          tabelaAdmin.innerHTML = '<p class="text-xs text-slate-500">Nenhum atendimento no período selecionado.</p>';
+        } else {
+          tabelaAdmin.innerHTML = logsFiltrados.map(l => `
+            <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs text-slate-300">
+              <div>
+                <span class="font-bold text-white block">${escapeHTML(l.paciente)}</span>
+                <span class="text-[10px] text-slate-400">Atendido por: ${escapeHTML(l.medico)}</span>
+              </div>
+              <span class="text-xs font-semibold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">${l.data}</span>
+            </div>
+          `).join('');
+        }
 
         document.getElementById('admin-lista-medicos').innerHTML = (d.medicos || []).map(m => `
           <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3">
@@ -1238,7 +1511,7 @@
               <div>
                 <span class="font-bold text-sm text-white block">${escapeHTML(m.nome)}</span>
                 <span class="text-xs text-slate-400 block">CRM: ${m.crm} | CPF: ${m.cpf} | E-mail: ${m.email || 'N/I'}</span>
-                <span class="text-xs text-emerald-400 font-semibold block mt-0.5">Atendimentos Concluídos: ${m.atendimentosConcluidos || 0}</span>
+                <span class="text-xs text-emerald-400 font-semibold block mt-0.5">Atendimentos Concluidos: ${m.atendimentosConcluidos || 0}</span>
               </div>
             </div>
             <div class="flex gap-2">

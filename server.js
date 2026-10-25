@@ -100,6 +100,7 @@ function carregarStats(tenantId) {
     totalGeralAcessos: 0, 
     perfis: { medicos: 0, pacientes: 0, geral: 0 },
     historicoDiario: {}, 
+    historicoSemanal: {},
     historicoMensal: {},
     historicoAnual: {}
   };
@@ -125,14 +126,20 @@ function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
 let filaPacientes = [];
 let consultasAtivas = new Map();
 let medicosOnline = new Map();
+let pacientesConectados = new Set();
 let logsConsultas = [];
 
 function obterDataHoraBR() {
   const agora = new Date();
+  const primeiroDiaAno = new Date(agora.getFullYear(), 0, 1);
+  const dias = Math.floor((agora - primeiroDiaAno) / (24 * 60 * 60 * 1000));
+  const semanaNum = Math.ceil((agora.getDay() + 1 + dias) / 7);
+
   return {
     data: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }),
     hora: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza' }),
     dataHoraCompleta: agora.toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }),
+    semanaAno: `Semana ${semanaNum}/${agora.getFullYear()}`,
     mesAno: `${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()}`,
     ano: `${agora.getFullYear()}`
   };
@@ -150,13 +157,16 @@ function obterMedicosComStatus(tenantId) {
     foto: m.foto || '/images/default-avatar.png',
     statusCadastro: m.status,
     atendimentosConcluidos: m.atendimentosConcluidos || 0,
-    historicoAtendimentos: m.historicoAtendimentos || {},
+    historicoAtendimentosList: m.historicoAtendimentosList || [],
     isOnline: cpfsOnline.has(m.cpf)
   }));
 }
 
 function obterFilaPorTenant(tenantKey) {
-  return filaPacientes.filter(p => p.tenantKey === tenantKey);
+  return filaPacientes.filter(p => p.tenantKey === tenantKey).map(p => ({
+    ...p,
+    isOnline: pacientesConectados.has(p.id)
+  }));
 }
 
 // ENDPOINTS DA API
@@ -198,7 +208,66 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   res.json({ filename: req.file.filename, originalname: req.file.originalname, path: `/uploads/${req.file.filename}` });
 });
 
-// PACIENTES: LOGIN E RECUPERAÇÃO DE SENHA
+// PACIENTES: CADASTRO, LOGIN, EDIÇÃO E RECUPERAÇÃO DE SENHA
+app.post('/api/paciente/cadastro', upload.single('fotoPerfil'), (req, res) => {
+  const key = identificarTenantKey(req);
+  const pacientes = carregarPacientes(key);
+  const { nome, cpf, email, senha, dataNascimento, telefone, endereco } = req.body;
+  const fotoPath = req.file ? `/uploads/${req.file.filename}` : '/images/default-avatar.png';
+
+  if (!nome || !cpf || !email || !senha) return res.status(400).json({ error: 'Preencha os campos obrigatórios.' });
+  
+  let paciente = pacientes.find(p => p.cpf === cpf);
+  const dh = obterDataHoraBR();
+
+  if (paciente) {
+    paciente.nome = nome;
+    paciente.email = email;
+    paciente.senha = senha;
+    if (dataNascimento) paciente.dataNascimento = dataNascimento;
+    if (telefone) paciente.telefone = telefone;
+    if (endereco) paciente.endereco = endereco;
+    if (req.file) paciente.foto = fotoPath;
+  } else {
+    paciente = {
+      id: Date.now().toString(),
+      nome,
+      cpf,
+      email,
+      senha,
+      dataNascimento: dataNascimento || '',
+      telefone: telefone || '',
+      endereco: endereco || '',
+      foto: fotoPath,
+      status: 'ativo',
+      dataCadastro: dh.dataHoraCompleta
+    };
+    pacientes.push(paciente);
+  }
+
+  salvarPacientes(key, pacientes);
+  res.json({ success: true, paciente });
+});
+
+app.post('/api/paciente/editar-perfil', upload.single('fotoPerfil'), (req, res) => {
+  const key = identificarTenantKey(req);
+  const pacientes = carregarPacientes(key);
+  const { id, nome, email, telefone, endereco, senha } = req.body;
+
+  const paciente = pacientes.find(p => p.id === id);
+  if (!paciente) return res.status(404).json({ error: 'Paciente não encontrado.' });
+
+  if (nome) paciente.nome = nome;
+  if (email) paciente.email = email;
+  if (telefone) paciente.telefone = telefone;
+  if (endereco) paciente.endereco = endereco;
+  if (senha) paciente.senha = senha;
+  if (req.file) paciente.foto = `/uploads/${req.file.filename}`;
+
+  salvarPacientes(key, pacientes);
+  res.json({ success: true, paciente });
+});
+
 app.post('/api/paciente/login', (req, res) => {
   const key = identificarTenantKey(req);
   const pacientes = carregarPacientes(key);
@@ -219,7 +288,7 @@ app.post('/api/paciente/recuperar-senha', (req, res) => {
   const paciente = pacientes.find(p => p.email === email);
   if (!paciente) return res.status(404).json({ error: 'E-mail não encontrado no sistema.' });
 
-  res.json({ success: true, message: 'Instruções para redefinição de senha enviadas para o e-mail informado.' });
+  res.json({ success: true, message: 'Instruções enviadas para o seu e-mail.' });
 });
 
 app.post('/api/medico/cadastro', upload.single('fotoPerfil'), (req, res) => {
@@ -241,7 +310,7 @@ app.post('/api/medico/cadastro', upload.single('fotoPerfil'), (req, res) => {
     foto: fotoPath,
     status: 'pendente', 
     atendimentosConcluidos: 0,
-    historicoAtendimentos: {}
+    historicoAtendimentosList: []
   };
   medicos.push(novoMedico);
   salvarMedicos(key, medicos);
@@ -275,7 +344,7 @@ app.post('/api/medico/editar-perfil', upload.single('fotoPerfil'), (req, res) =>
       cpf: medico.cpf, 
       foto: medico.foto, 
       atendimentosConcluidos: medico.atendimentosConcluidos || 0,
-      historicoAtendimentos: medico.historicoAtendimentos || {},
+      historicoAtendimentosList: medico.historicoAtendimentosList || [],
       tenantKey: key 
     } 
   });
@@ -302,7 +371,7 @@ app.post('/api/medico/login', (req, res) => {
       cpf: medico.cpf, 
       foto: medico.foto || '/images/default-avatar.png',
       atendimentosConcluidos: medico.atendimentosConcluidos || 0,
-      historicoAtendimentos: medico.historicoAtendimentos || {},
+      historicoAtendimentosList: medico.historicoAtendimentosList || [],
       tenantKey: key 
     } 
   });
@@ -328,6 +397,7 @@ app.get('/api/admin/dados', (req, res) => {
     logsConsultas: logsConsultas.filter(l => l.tenantKey === key),
     perfis: statsGeral.perfis || { medicos: 0, pacientes: 0, geral: 0 },
     atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
+    atendimentosSemana: statsGeral.historicoSemanal[dh.semanaAno] || 0,
     atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
     atendimentosAno: statsGeral.historicoAnual[dh.ano] || 0,
     totalGeralAcessos: statsGeral.totalGeralAcessos || 0,
@@ -414,22 +484,48 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
     stats.historicoDiario[dh.data] = (stats.historicoDiario[dh.data] || 0) + 1;
+    stats.historicoSemanal[dh.semanaAno] = (stats.historicoSemanal[dh.semanaAno] || 0) + 1;
     stats.historicoMensal[dh.mesAno] = (stats.historicoMensal[dh.mesAno] || 0) + 1;
     stats.historicoAnual[dh.ano] = (stats.historicoAnual[dh.ano] || 0) + 1;
     salvarStats(tenantKey, stats);
+
+    const registroAtendimento = {
+      sessionId,
+      pacienteNome: paciente?.nome || 'Paciente',
+      pacienteCpf: paciente?.cpf || 'N/I',
+      medicoNome: medico?.nome || 'Dr. Plantonista',
+      medicoCrm: medico?.crm || 'N/A',
+      dataHora: dh.dataHoraCompleta,
+      data: dh.data,
+      semana: dh.semanaAno,
+      mes: dh.mesAno,
+      ano: dh.ano
+    };
 
     if (medico && medico.cpf) {
       const medicos = carregarMedicos(tenantKey);
       const mObj = medicos.find(m => m.cpf === medico.cpf);
       if (mObj) {
         mObj.atendimentosConcluidos = (mObj.atendimentosConcluidos || 0) + 1;
-        if (!mObj.historicoAtendimentos) mObj.historicoAtendimentos = {};
-        mObj.historicoAtendimentos[dh.data] = (mObj.historicoAtendimentos[dh.data] || 0) + 1;
-        mObj.historicoAtendimentos[dh.mesAno] = (mObj.historicoAtendimentos[dh.mesAno] || 0) + 1;
-        mObj.historicoAtendimentos[dh.ano] = (mObj.historicoAtendimentos[dh.ano] || 0) + 1;
+        if (!mObj.historicoAtendimentosList) mObj.historicoAtendimentosList = [];
+        mObj.historicoAtendimentosList.push(registroAtendimento);
         salvarMedicos(tenantKey, medicos);
       }
     }
+
+    logsConsultas.push({
+      sessionId,
+      tenantKey,
+      paciente: paciente?.nome || 'Paciente',
+      pacienteCpf: paciente?.cpf || 'N/I',
+      medico: medico?.nome || 'Dr. Plantonista',
+      data: dh.dataHoraCompleta,
+      dataApenas: dh.data,
+      semanaApenas: dh.semanaAno,
+      mesApenas: dh.mesAno,
+      anoApenas: dh.ano,
+      zipUrl: `/api/admin/download-log/${sessionId}`
+    });
 
     const pdfPath = path.join(__dirname, 'uploads', `anamnese-${sessionId}.pdf`);
     const zipPath = path.join(__dirname, 'logs', `consulta-${sessionId}.zip`);
@@ -466,17 +562,6 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
         });
 
         archive.finalize();
-
-        output.on('close', () => {
-          logsConsultas.push({
-            sessionId,
-            tenantKey,
-            paciente: paciente?.nome || 'Paciente',
-            medico: medico?.nome || 'Dr. Plantonista',
-            data: dh.dataHoraCompleta,
-            zipUrl: `/api/admin/download-log/${sessionId}`
-          });
-        });
       } catch (e) { console.error('Erro no ZIP:', e); }
     });
   } catch (err) { console.error('Erro geral ao finalizar:', err); }
@@ -488,6 +573,8 @@ io.on('connection', (socket) => {
   const tenantKey = reqHost.includes('paracuru') ? 'paracuru' : (reqHost.includes('palmacia') ? 'palmacia' : 'default');
 
   socket.join(tenantKey);
+
+  pacientesConectados.add(socket.id);
 
   registrarAcessoAvancado(tenantKey, 'geral');
 
@@ -614,6 +701,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    pacientesConectados.delete(socket.id);
     filaPacientes = filaPacientes.filter(p => p.id !== socket.id);
     medicosOnline.delete(socket.id);
 
