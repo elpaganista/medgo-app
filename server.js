@@ -81,6 +81,19 @@ function salvarMedicos(tenantId, lista) {
   try { fs.writeFileSync(getTenantPath(tenantId, 'medicos.json'), JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
 }
 
+function carregarPacientes(tenantId) {
+  const file = getTenantPath(tenantId, 'pacientes.json');
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify([], null, 2));
+    return [];
+  }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return []; }
+}
+
+function salvarPacientes(tenantId, lista) {
+  try { fs.writeFileSync(getTenantPath(tenantId, 'pacientes.json'), JSON.stringify(lista, null, 2)); } catch (err) { console.error(err); }
+}
+
 function carregarStats(tenantId) {
   const file = getTenantPath(tenantId, 'estatisticas.json');
   const padrao = { 
@@ -110,7 +123,6 @@ function registrarAcessoAvancado(tenantKey, tipoPerfil = 'geral') {
 }
 
 let filaPacientes = [];
-let registroPacientesGeral = [];
 let consultasAtivas = new Map();
 let medicosOnline = new Map();
 let logsConsultas = [];
@@ -135,6 +147,7 @@ function obterMedicosComStatus(tenantId) {
     crm: m.crm,
     cpf: m.cpf,
     email: m.email,
+    foto: m.foto || '/images/default-avatar.png',
     statusCadastro: m.status,
     atendimentosConcluidos: m.atendimentosConcluidos || 0,
     isOnline: cpfsOnline.has(m.cpf)
@@ -184,20 +197,31 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   res.json({ filename: req.file.filename, originalname: req.file.originalname, path: `/uploads/${req.file.filename}` });
 });
 
-app.post('/api/medico/cadastro', (req, res) => {
+app.post('/api/medico/cadastro', upload.single('fotoPerfil'), (req, res) => {
   const key = identificarTenantKey(req);
   const medicos = carregarMedicos(key);
   const { nome, cpf, email, crm, senha } = req.body;
+  const fotoPath = req.file ? `/uploads/${req.file.filename}` : '/images/default-avatar.png';
 
   if (!nome || !cpf || !crm || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
   if (medicos.find(m => m.cpf === cpf)) return res.status(400).json({ error: 'CPF já cadastrado.' });
 
-  const novoMedico = { id: Date.now().toString(), nome, cpf, email, crm, senha, status: 'pendente', atendimentosConcluidos: 0 };
+  const novoMedico = { 
+    id: Date.now().toString(), 
+    nome, 
+    cpf, 
+    email, 
+    crm, 
+    senha, 
+    foto: fotoPath,
+    status: 'pendente', 
+    atendimentosConcluidos: 0 
+  };
   medicos.push(novoMedico);
   salvarMedicos(key, medicos);
 
   io.to(key).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
-  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação.' });
+  res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação do administrador.' });
 });
 
 app.post('/api/medico/login', (req, res) => {
@@ -219,6 +243,7 @@ app.post('/api/medico/login', (req, res) => {
       nome: medico.nome, 
       crm: medico.crm, 
       cpf: medico.cpf, 
+      foto: medico.foto || '/images/default-avatar.png',
       atendimentosConcluidos: medico.atendimentosConcluidos || 0,
       tenantKey: key 
     } 
@@ -241,8 +266,8 @@ app.get('/api/admin/dados', (req, res) => {
 
   res.json({
     medicos: obterMedicosComStatus(key),
+    pacientes: carregarPacientes(key),
     logsConsultas: logsConsultas.filter(l => l.tenantKey === key),
-    registroPacientesGeral: registroPacientesGeral.filter(p => p.tenantKey === key),
     perfis: statsGeral.perfis || { medicos: 0, pacientes: 0, geral: 0 },
     atendimentosHoje: statsGeral.historicoDiario[dh.data] || 0,
     atendimentosMes: statsGeral.historicoMensal[dh.mesAno] || 0,
@@ -293,6 +318,16 @@ app.post('/api/admin/medico/excluir', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/admin/paciente/excluir', (req, res) => {
+  const key = identificarTenantKey(req);
+  let pacientes = carregarPacientes(key);
+  const { pacienteId } = req.body;
+
+  pacientes = pacientes.filter(p => p.id !== pacienteId);
+  salvarPacientes(key, pacientes);
+  res.json({ success: true, message: 'Paciente removido com sucesso.' });
+});
+
 app.get('/api/admin/download-log/:sessionId', (req, res) => {
   const zipPath = path.join(__dirname, 'logs', `consulta-${req.params.sessionId}.zip`);
   if (fs.existsSync(zipPath)) return res.download(zipPath);
@@ -305,13 +340,11 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
     const stats = carregarStats(tenantKey);
     const { medico, paciente, anamnese, arquivosTrocados, sessionId } = dados;
 
-    // Incrementa contagem real de chamadas concluídas
     stats.historicoDiario[dh.data] = (stats.historicoDiario[dh.data] || 0) + 1;
     stats.historicoMensal[dh.mesAno] = (stats.historicoMensal[dh.mesAno] || 0) + 1;
     stats.historicoAnual[dh.ano] = (stats.historicoAnual[dh.ano] || 0) + 1;
     salvarStats(tenantKey, stats);
 
-    // Incrementa o contador individual do médico
     if (medico && medico.cpf) {
       const medicos = carregarMedicos(tenantKey);
       const mObj = medicos.find(m => m.cpf === medico.cpf);
@@ -405,9 +438,16 @@ io.on('connection', (socket) => {
       status: 'Em Espera',
       ipConsentimento: socket.handshake.address 
     };
-    filaPacientes.push(paciente);
-    registroPacientesGeral.push(paciente);
     
+    filaPacientes.push(paciente);
+    
+    // Salva cadastro persistente de pacientes
+    const cadastrados = carregarPacientes(tenantKey);
+    if (!cadastrados.find(p => p.cpf === dados.cpf)) {
+      cadastrados.push({ id: Date.now().toString(), ...dados, dataCadastro: dh.dataHoraCompleta });
+      salvarPacientes(tenantKey, cadastrados);
+    }
+
     io.to(tenantKey).emit('atualizar-fila', obterFilaPorTenant(tenantKey));
   });
 
@@ -446,7 +486,6 @@ io.on('connection', (socket) => {
       pacienteInfo: dadosConsulta.paciente
     });
 
-    // Envia dados completos do paciente para o médico
     socket.emit('dados-paciente-atendimento', dadosConsulta.paciente);
   });
 

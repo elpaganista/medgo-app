@@ -22,22 +22,19 @@
 </head>
 <body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans antialiased transition-colors duration-200 overflow-x-hidden">
 
-  <!-- HEADER BRANDING CENTRALIZADO E LOGO AUMENTADA -->
+  <!-- HEADER BRANDING CENTRALIZADO -->
   <header class="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
       
-      <!-- LADO ESQUERDO: LOGO AUMENTADA -->
       <div class="flex items-center">
         <img id="tenant-logo" src="/images/medgo-logo.png" alt="Logo" class="h-14 sm:h-16 w-auto object-contain transition-all" onerror="this.onerror=null;this.src='/images/medgo-logo.png'">
       </div>
 
-      <!-- CENTRO: NOME DA PREFEITURA / SECRETARIA CENTRALIZADO -->
       <div class="text-center flex-1 px-2">
         <h1 id="tenant-nome" class="font-extrabold text-base sm:text-xl leading-tight text-slate-900 dark:text-white">MedGo Telemedicina</h1>
         <p id="tenant-subtitulo" class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">Plataforma de Saúde Digital</p>
       </div>
 
-      <!-- LADO DIREITO: TEMA, BADGE TELEMEDICINA E CADEADO ADMIN -->
       <div class="flex items-center gap-2">
         <button onclick="alternarTema()" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-cyan-500 transition text-xs font-bold flex items-center gap-1.5" title="Alternar Tema">
           <i id="theme-icon" class="fa-solid fa-moon"></i>
@@ -86,7 +83,7 @@
       </div>
     </div>
 
-    <!-- TELA PACIENTE (COM DATA DE NASCIMENTO) -->
+    <!-- TELA PACIENTE (DATA DE NASCIMENTO DIGITÁVEL COM MÁSCARA) -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
       <div id="paciente-form-container" class="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -100,7 +97,7 @@
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Data de Nascimento</label>
-              <input type="date" id="paciente-nascimento" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+              <input type="text" id="paciente-nascimento" required placeholder="DD/MM/AAAA" maxlength="10" oninput="mascaraData(this)" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CPF</label>
@@ -138,7 +135,7 @@
       </div>
     </div>
 
-    <!-- TELA MÉDICO (COM CONTADOR INDIVIDUAL) -->
+    <!-- TELA MÉDICO (COM FOTO DE PERFIL E DASHBOARD COMPLETO) -->
     <div id="screen-medico" class="hidden flex-1 flex flex-col gap-4">
       <div id="medico-auth-container" class="max-w-md w-full mx-auto my-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
         <div class="flex border-b border-slate-200 dark:border-slate-700 mb-4">
@@ -161,7 +158,7 @@
           </div>
         </form>
 
-        <form id="form-medico-cadastro" onsubmit="fazerCadastroMedico(event)" class="hidden space-y-3">
+        <form id="form-medico-cadastro" onsubmit="fazerCadastroMedico(event)" class="hidden space-y-3" enctype="multipart/form-data">
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
             <input type="text" id="cad-medico-nome" required placeholder="Dr. Nome Exemplo" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500">
@@ -175,6 +172,10 @@
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CRM / UF</label>
               <input type="text" id="cad-medico-crm" required placeholder="123456/CE" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500">
             </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Foto de Perfil (Opcional)</label>
+            <input type="file" id="cad-medico-foto" accept="image/*" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">E-mail Profissional</label>
@@ -193,23 +194,31 @@
 
       <div id="medico-dashboard" class="hidden flex-1 flex flex-col md:flex-row gap-4">
         <div class="w-full md:w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col shadow-xl">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700 mb-3">
+          
+          <!-- PERFIL DO MÉDICO COM FOTO -->
+          <div class="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-700 mb-3">
+            <img id="medico-logado-foto" src="/images/default-avatar.png" alt="Avatar Médico" class="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow">
+            <div class="text-xs">
+              <span id="medico-logado-nome" class="font-bold text-slate-800 dark:text-slate-200 block text-sm">Dr. Médico</span>
+              <span id="medico-logado-crm" class="text-slate-500 dark:text-slate-400 block">CRM: ---</span>
+              <span id="medico-logado-atendimentos" class="text-emerald-500 font-bold block mt-0.5">Atendimentos Concluídos: 0</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pb-2 mb-2">
             <div class="flex items-center gap-2">
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
               <h3 class="font-bold text-sm text-slate-900 dark:text-white">Pacientes na Fila</h3>
             </div>
             <span id="medico-fila-count" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-500">0</span>
           </div>
-          <div id="medico-lista-pacientes" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[400px] md:max-h-none">
+          
+          <div id="medico-lista-pacientes" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[350px] md:max-h-none">
             <p class="text-xs text-slate-500 text-center py-8">Nenhum paciente na fila no momento.</p>
           </div>
-          <div class="pt-3 border-t border-slate-200 dark:border-slate-700 mt-auto flex items-center justify-between">
-            <div class="text-xs">
-              <span id="medico-logado-nome" class="font-bold text-slate-800 dark:text-slate-200 block">Dr. Médico</span>
-              <span id="medico-logado-crm" class="text-slate-500 dark:text-slate-400 block">CRM: ---</span>
-              <span id="medico-logado-atendimentos" class="text-emerald-500 font-bold block mt-0.5">Atendimentos Concluídos: 0</span>
-            </div>
-            <button onclick="logoutMedico()" class="text-xs text-red-500 font-semibold px-2 py-1 bg-red-500/10 rounded self-end">Sair</button>
+
+          <div class="pt-3 border-t border-slate-200 dark:border-slate-700 mt-auto flex justify-end">
+            <button onclick="logoutMedico()" class="text-xs text-red-500 font-semibold px-3 py-1 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition">Sair do Consultório</button>
           </div>
         </div>
 
@@ -257,10 +266,10 @@
         </div>
       </div>
 
-      <!-- PAINEL DIREITO: DADOS DO PACIENTE + ANAMNESE + DOCUMENTOS -->
+      <!-- PAINEL DIREITO: DADOS DO PACIENTE + ANAMNESE + RECEITAS -->
       <div class="h-[40vh] md:h-full w-full md:w-96 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col z-30 overflow-y-auto">
         
-        <!-- CARD EXCLUSIVO DO MÉDICO: DADOS DO PACIENTE EM ATENDIMENTO -->
+        <!-- CARD EXCLUSIVO DO MÉDICO: DADOS DO PACIENTE -->
         <div id="box-dados-paciente" class="hidden p-4 border-b border-slate-800 bg-slate-950/80">
           <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <i class="fa-solid fa-address-card"></i> Identificação do Paciente
@@ -328,7 +337,7 @@
     </div>
   </div>
 
-  <!-- MODAL ADMIN -->
+  <!-- MODAL ADMIN COM EXCLUSÃO DE PACIENTES -->
   <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950/80 bg-blur z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 my-8">
       <div class="flex items-center justify-between pb-3 border-b border-slate-700">
@@ -358,6 +367,11 @@
         </div>
 
         <div>
+          <h4 class="font-bold text-sm text-white mb-2">Gestão e Remoção de Pacientes Cadastrados</h4>
+          <div id="admin-lista-pacientes" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <div>
           <h4 class="font-bold text-sm text-white mb-2">Logs & Prontuários (.ZIP)</h4>
           <div id="admin-lista-logs" class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto"></div>
         </div>
@@ -374,6 +388,13 @@
     let pendingCandidates = [];
     let isAudioMuted = false;
     let isVideoOff = false;
+
+    function mascaraData(v) {
+      let val = v.value.replace(/\D/g, "");
+      if (val.length > 2) val = val.substring(0, 2) + "/" + val.substring(2);
+      if (val.length > 5) val = val.substring(0, 5) + "/" + val.substring(5, 9);
+      v.value = val;
+    }
 
     function alternarTema() {
       const html = document.documentElement;
@@ -515,21 +536,25 @@
       document.getElementById('medico-dashboard').classList.remove('hidden');
       document.getElementById('medico-logado-nome').innerText = medicoLogado.nome;
       document.getElementById('medico-logado-crm').innerText = 'CRM: ' + medicoLogado.crm;
+      document.getElementById('medico-logado-foto').src = medicoLogado.foto || '/images/default-avatar.png';
       document.getElementById('medico-logado-atendimentos').innerText = 'Atendimentos Concluídos: ' + (medicoLogado.atendimentosConcluidos || 0);
     }
 
     function fazerCadastroMedico(e) {
       e.preventDefault();
-      const nome = document.getElementById('cad-medico-nome').value;
-      const cpf = document.getElementById('cad-medico-cpf').value;
-      const crm = document.getElementById('cad-medico-crm').value;
-      const email = document.getElementById('cad-medico-email').value;
-      const senha = document.getElementById('cad-medico-senha').value;
+      const formData = new FormData();
+      formData.append('nome', document.getElementById('cad-medico-nome').value);
+      formData.append('cpf', document.getElementById('cad-medico-cpf').value);
+      formData.append('crm', document.getElementById('cad-medico-crm').value);
+      formData.append('email', document.getElementById('cad-medico-email').value);
+      formData.append('senha', document.getElementById('cad-medico-senha').value);
+      
+      const fotoFile = document.getElementById('cad-medico-foto').files[0];
+      if (fotoFile) formData.append('fotoPerfil', fotoFile);
 
       fetch('/api/medico/cadastro', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ nome, cpf, crm, email, senha })
+        body: formData
       }).then(r => r.json()).then(res => {
         alert(res.message || res.error);
         if (res.success) alternarAbaMedico('login');
@@ -575,7 +600,7 @@
     socket.on('dados-paciente-atendimento', (paciente) => {
       if (medicoLogado && paciente) {
         document.getElementById('info-paciente-nome').innerText = paciente.nome || '---';
-        document.getElementById('info-paciente-nascimento').innerText = paciente.dataNascimento ? new Date(paciente.dataNascimento).toLocaleDateString('pt-BR') : '---';
+        document.getElementById('info-paciente-nascimento').innerText = paciente.dataNascimento || '---';
         document.getElementById('info-paciente-cpf').innerText = paciente.cpf || '---';
         document.getElementById('info-paciente-telefone').innerText = paciente.telefone || '---';
         document.getElementById('info-paciente-endereco').innerText = paciente.endereco || '---';
@@ -869,8 +894,11 @@
 
         document.getElementById('admin-lista-medicos').innerHTML = (d.medicos || []).map(m => `
           <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
-            <div>
-              <span class="font-bold text-white">${escapeHTML(m.nome)}</span> (CRM: ${m.crm}) - Atendimentos: <strong class="text-emerald-400">${m.atendimentosConcluidos || 0}</strong>
+            <div class="flex items-center gap-2">
+              <img src="${m.foto || '/images/default-avatar.png'}" class="w-7 h-7 rounded-full object-cover">
+              <div>
+                <span class="font-bold text-white">${escapeHTML(m.nome)}</span> (CRM: ${m.crm}) - Atendimentos: <strong class="text-emerald-400">${m.atendimentosConcluidos || 0}</strong>
+              </div>
             </div>
             <div class="flex gap-1">
               ${m.statusCadastro !== 'aprovado' ? `<button onclick="alterarStatusMedico('${m.id}', 'aprovado')" class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded hover:bg-emerald-500">Aprovar</button>` : ''}
@@ -880,6 +908,15 @@
             </div>
           </div>
         `).join('') || '<p class="text-xs text-slate-500">Nenhum médico cadastrado.</p>';
+
+        document.getElementById('admin-lista-pacientes').innerHTML = (d.pacientes || []).map(p => `
+          <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
+            <div>
+              <span class="font-bold text-white">${escapeHTML(p.nome)}</span> | CPF: ${p.cpf || 'N/I'} | Nascimento: ${p.dataNascimento || 'N/I'}
+            </div>
+            <button onclick="excluirPaciente('${p.id}')" class="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded">Excluir</button>
+          </div>
+        `).join('') || '<p class="text-xs text-slate-500">Nenhum paciente cadastrado.</p>';
 
         document.getElementById('admin-lista-logs').innerHTML = (d.logsConsultas || []).map(l => `
           <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
@@ -904,6 +941,16 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ medicoId })
       }).then(() => carregarDadosAdmin());
+    }
+
+    function excluirPaciente(pacienteId) {
+      if (confirm('Tem certeza que deseja excluir este paciente?')) {
+        fetch('/api/admin/paciente/excluir', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ pacienteId })
+        }).then(() => carregarDadosAdmin());
+      }
     }
 
     function zerarEstatisticasAdmin() {
