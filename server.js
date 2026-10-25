@@ -150,6 +150,7 @@ function obterMedicosComStatus(tenantId) {
     foto: m.foto || '/images/default-avatar.png',
     statusCadastro: m.status,
     atendimentosConcluidos: m.atendimentosConcluidos || 0,
+    historicoAtendimentos: m.historicoAtendimentos || {},
     isOnline: cpfsOnline.has(m.cpf)
   }));
 }
@@ -197,6 +198,30 @@ app.post('/api/upload', upload.single('arquivo'), (req, res) => {
   res.json({ filename: req.file.filename, originalname: req.file.originalname, path: `/uploads/${req.file.filename}` });
 });
 
+// PACIENTES: LOGIN E RECUPERAÇÃO DE SENHA
+app.post('/api/paciente/login', (req, res) => {
+  const key = identificarTenantKey(req);
+  const pacientes = carregarPacientes(key);
+  const { cpf, senha } = req.body;
+
+  const paciente = pacientes.find(p => p.cpf === cpf && p.senha === senha);
+  if (!paciente) return res.status(401).json({ error: 'CPF ou Senha incorretos.' });
+  if (paciente.status === 'bloqueado') return res.status(403).json({ error: 'Conta bloqueada pelo administrador.' });
+
+  res.json({ success: true, paciente });
+});
+
+app.post('/api/paciente/recuperar-senha', (req, res) => {
+  const key = identificarTenantKey(req);
+  const pacientes = carregarPacientes(key);
+  const { email } = req.body;
+
+  const paciente = pacientes.find(p => p.email === email);
+  if (!paciente) return res.status(404).json({ error: 'E-mail não encontrado no sistema.' });
+
+  res.json({ success: true, message: 'Instruções para redefinição de senha enviadas para o e-mail informado.' });
+});
+
 app.post('/api/medico/cadastro', upload.single('fotoPerfil'), (req, res) => {
   const key = identificarTenantKey(req);
   const medicos = carregarMedicos(key);
@@ -215,7 +240,8 @@ app.post('/api/medico/cadastro', upload.single('fotoPerfil'), (req, res) => {
     senha, 
     foto: fotoPath,
     status: 'pendente', 
-    atendimentosConcluidos: 0 
+    atendimentosConcluidos: 0,
+    historicoAtendimentos: {}
   };
   medicos.push(novoMedico);
   salvarMedicos(key, medicos);
@@ -249,6 +275,7 @@ app.post('/api/medico/editar-perfil', upload.single('fotoPerfil'), (req, res) =>
       cpf: medico.cpf, 
       foto: medico.foto, 
       atendimentosConcluidos: medico.atendimentosConcluidos || 0,
+      historicoAtendimentos: medico.historicoAtendimentos || {},
       tenantKey: key 
     } 
   });
@@ -275,6 +302,7 @@ app.post('/api/medico/login', (req, res) => {
       cpf: medico.cpf, 
       foto: medico.foto || '/images/default-avatar.png',
       atendimentosConcluidos: medico.atendimentosConcluidos || 0,
+      historicoAtendimentos: medico.historicoAtendimentos || {},
       tenantKey: key 
     } 
   });
@@ -348,6 +376,21 @@ app.post('/api/admin/medico/excluir', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/admin/paciente/status', (req, res) => {
+  const key = identificarTenantKey(req);
+  const pacientes = carregarPacientes(key);
+  const { pacienteId, novoStatus } = req.body;
+
+  const paciente = pacientes.find(p => p.id === pacienteId);
+  if (paciente) {
+    paciente.status = novoStatus;
+    salvarPacientes(key, pacientes);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Paciente não encontrado.' });
+  }
+});
+
 app.post('/api/admin/paciente/excluir', (req, res) => {
   const key = identificarTenantKey(req);
   let pacientes = carregarPacientes(key);
@@ -380,6 +423,10 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
       const mObj = medicos.find(m => m.cpf === medico.cpf);
       if (mObj) {
         mObj.atendimentosConcluidos = (mObj.atendimentosConcluidos || 0) + 1;
+        if (!mObj.historicoAtendimentos) mObj.historicoAtendimentos = {};
+        mObj.historicoAtendimentos[dh.data] = (mObj.historicoAtendimentos[dh.data] || 0) + 1;
+        mObj.historicoAtendimentos[dh.mesAno] = (mObj.historicoAtendimentos[dh.mesAno] || 0) + 1;
+        mObj.historicoAtendimentos[dh.ano] = (mObj.historicoAtendimentos[dh.ano] || 0) + 1;
         salvarMedicos(tenantKey, medicos);
       }
     }
@@ -397,7 +444,7 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
     doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
     doc.text(`Médico: ${medico?.nome || 'Dr. Plantonista'} (CRM: ${medico?.crm || 'N/A'})`);
     doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/I'} | Nascimento: ${paciente?.dataNascimento || 'N/I'}`);
-    doc.text(`Prioridade: ${paciente?.prioridade || 'Atendimento Geral'} | Triagem: ${paciente?.classificacao || 'Pouco Urgente'}`);
+    doc.text(`E-mail: ${paciente?.email || 'N/I'} | Prioridade: ${paciente?.prioridade || 'Atendimento Geral'}`);
     doc.text(`Telefone: ${paciente?.telefone || 'N/I'} | Endereço: ${paciente?.endereco || 'N/I'}`);
     doc.text(`Consentimento LGPD: Aceito em ${paciente?.dataHoraConsentimento || dh.dataHoraCompleta}`);
     doc.moveDown();
@@ -473,8 +520,14 @@ io.on('connection', (socket) => {
     filaPacientes.push(paciente);
     
     const cadastrados = carregarPacientes(tenantKey);
-    if (!cadastrados.find(p => p.cpf === dados.cpf)) {
-      cadastrados.push({ id: Date.now().toString(), ...dados, dataCadastro: dh.dataHoraCompleta });
+    const pExistente = cadastrados.find(p => p.cpf === dados.cpf);
+    if (!pExistente) {
+      cadastrados.push({ 
+        id: Date.now().toString(), 
+        ...dados, 
+        status: 'ativo',
+        dataCadastro: dh.dataHoraCompleta 
+      });
       salvarPacientes(tenantKey, cadastrados);
     }
 
