@@ -224,6 +224,36 @@ app.post('/api/medico/cadastro', upload.single('fotoPerfil'), (req, res) => {
   res.json({ success: true, message: 'Cadastro enviado! Aguarde aprovação do administrador.' });
 });
 
+app.post('/api/medico/editar-perfil', upload.single('fotoPerfil'), (req, res) => {
+  const key = identificarTenantKey(req);
+  const medicos = carregarMedicos(key);
+  const { id, nome, crm, senha } = req.body;
+
+  const medico = medicos.find(m => m.id === id);
+  if (!medico) return res.status(404).json({ error: 'Médico não encontrado.' });
+
+  if (nome) medico.nome = nome;
+  if (crm) medico.crm = crm;
+  if (senha) medico.senha = senha;
+  if (req.file) medico.foto = `/uploads/${req.file.filename}`;
+
+  salvarMedicos(key, medicos);
+  io.to(key).emit('atualizar-lista-medicos-geral', obterMedicosComStatus(key));
+
+  res.json({ 
+    success: true, 
+    medico: { 
+      id: medico.id, 
+      nome: medico.nome, 
+      crm: medico.crm, 
+      cpf: medico.cpf, 
+      foto: medico.foto, 
+      atendimentosConcluidos: medico.atendimentosConcluidos || 0,
+      tenantKey: key 
+    } 
+  });
+});
+
 app.post('/api/medico/login', (req, res) => {
   const key = identificarTenantKey(req);
   const medicos = carregarMedicos(key);
@@ -366,7 +396,8 @@ function processarFinalizacaoConsulta(dados, tenantKey) {
     doc.moveDown();
     doc.fontSize(12).text(`Data/Hora: ${dh.dataHoraCompleta}`);
     doc.text(`Médico: ${medico?.nome || 'Dr. Plantonista'} (CRM: ${medico?.crm || 'N/A'})`);
-    doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/A'} | Nascimento: ${paciente?.dataNascimento || 'N/I'}`);
+    doc.text(`Paciente: ${paciente?.nome || 'Paciente'} | CPF: ${paciente?.cpf || 'N/I'} | Nascimento: ${paciente?.dataNascimento || 'N/I'}`);
+    doc.text(`Prioridade: ${paciente?.prioridade || 'Atendimento Geral'} | Triagem: ${paciente?.classificacao || 'Pouco Urgente'}`);
     doc.text(`Telefone: ${paciente?.telefone || 'N/I'} | Endereço: ${paciente?.endereco || 'N/I'}`);
     doc.text(`Consentimento LGPD: Aceito em ${paciente?.dataHoraConsentimento || dh.dataHoraCompleta}`);
     doc.moveDown();
@@ -441,7 +472,6 @@ io.on('connection', (socket) => {
     
     filaPacientes.push(paciente);
     
-    // Salva cadastro persistente de pacientes
     const cadastrados = carregarPacientes(tenantKey);
     if (!cadastrados.find(p => p.cpf === dados.cpf)) {
       cadastrados.push({ id: Date.now().toString(), ...dados, dataCadastro: dh.dataHoraCompleta });

@@ -83,7 +83,7 @@
       </div>
     </div>
 
-    <!-- TELA PACIENTE (DATA DE NASCIMENTO DIGITÁVEL COM MÁSCARA) -->
+    <!-- TELA PACIENTE (COM SELEÇÃO DE PRIORIDADE/TRIAGEM) -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6">
       <div id="paciente-form-container" class="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -102,6 +102,27 @@
             <div>
               <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CPF</label>
               <input type="text" id="paciente-cpf" required placeholder="000.000.000-00" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Prioridade / Perfil</label>
+              <select id="paciente-prioridade" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <option value="GERAL">Atendimento Geral</option>
+                <option value="GESTANTES">Gestante</option>
+                <option value="AUTISTAS">Autista</option>
+                <option value="IDOSO 60+">Idoso 60+</option>
+                <option value="IDOSO 80+">Idoso 80+</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Sintoma / Nível</label>
+              <select id="paciente-classificacao" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <option value="POUCO URGENTE">Pouco Urgente (Verde)</option>
+                <option value="URGENTE">Urgente (Amarelo)</option>
+                <option value="MUITO URGENTE">Muito Urgente (Laranja)</option>
+                <option value="EMERGÊNCIA">Emergência (Vermelho)</option>
+              </select>
             </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -135,8 +156,10 @@
       </div>
     </div>
 
-    <!-- TELA MÉDICO (COM FOTO DE PERFIL E DASHBOARD COMPLETO) -->
+    <!-- TELA MÉDICO (SISTEMA HUB + EDITAR PERFIL + DASHBOARD BI + FILA MANCHESTER) -->
     <div id="screen-medico" class="hidden flex-1 flex flex-col gap-4">
+      
+      <!-- AUTH LOGIN / CADASTRO -->
       <div id="medico-auth-container" class="max-w-md w-full mx-auto my-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
         <div class="flex border-b border-slate-200 dark:border-slate-700 mb-4">
           <button id="tab-login" onclick="alternarAbaMedico('login')" class="flex-1 py-2 text-sm font-bold text-emerald-500 border-b-2 border-emerald-500">Entrar</button>
@@ -192,43 +215,116 @@
         </form>
       </div>
 
-      <div id="medico-dashboard" class="hidden flex-1 flex flex-col md:flex-row gap-4">
-        <div class="w-full md:w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col shadow-xl">
-          
-          <!-- PERFIL DO MÉDICO COM FOTO -->
-          <div class="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-700 mb-3">
-            <img id="medico-logado-foto" src="/images/default-avatar.png" alt="Avatar Médico" class="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow">
-            <div class="text-xs">
-              <span id="medico-logado-nome" class="font-bold text-slate-800 dark:text-slate-200 block text-sm">Dr. Médico</span>
-              <span id="medico-logado-crm" class="text-slate-500 dark:text-slate-400 block">CRM: ---</span>
-              <span id="medico-logado-atendimentos" class="text-emerald-500 font-bold block mt-0.5">Atendimentos Concluídos: 0</span>
+      <!-- DASHBOARD MÉDICO LOGADO COM MENU HUB -->
+      <div id="medico-dashboard" class="hidden flex-1 flex flex-col gap-4">
+        
+        <!-- MENU HUB NAVEGAÇÃO -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+          <div class="flex items-center gap-3">
+            <img id="medico-logado-foto" src="/images/default-avatar.png" class="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow">
+            <div>
+              <h3 id="medico-logado-nome" class="font-extrabold text-base text-slate-900 dark:text-white">Dr. Médico</h3>
+              <p id="medico-logado-crm" class="text-xs text-slate-500 dark:text-slate-400">CRM: ---</p>
             </div>
           </div>
 
-          <div class="flex items-center justify-between pb-2 mb-2">
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <h3 class="font-bold text-sm text-slate-900 dark:text-white">Pacientes na Fila</h3>
+          <!-- BOTÕES DE NAVEGAÇÃO HUB -->
+          <div class="flex items-center gap-2">
+            <button onclick="mudarAbaHub('fila')" id="btn-hub-fila" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-list-check"></i> Fila de Atendimento
+            </button>
+            <button onclick="mudarAbaHub('bi')" id="btn-hub-bi" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-chart-line"></i> BI Ambulatorial
+            </button>
+            <button onclick="mudarAbaHub('perfil')" id="btn-hub-perfil" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-id-card"></i> Meu Perfil
+            </button>
+            <button onclick="logoutMedico()" class="px-3 py-2 bg-red-600/10 text-red-500 rounded-xl text-xs font-bold hover:bg-red-600/20 transition">
+              <i class="fa-solid fa-right-from-bracket"></i> Sair
+            </button>
+          </div>
+        </div>
+
+        <!-- CONTEÚDO HUB 1: FILA DE ATENDIMENTO COM BUSCA E TAGS MANCHESTER -->
+        <div id="hub-sec-fila" class="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col space-y-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-700 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-users text-cyan-500"></i> Fila de Espera ao Vivo
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Pacientes aguardando chamada para o consultório</p>
             </div>
-            <span id="medico-fila-count" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-500">0</span>
+            
+            <div class="relative w-full sm:w-72">
+              <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="input-busca-fila" oninput="filtrarFilaMedicos()" placeholder="Pesquisar por nome ou CPF..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
           </div>
+
+          <div id="medico-lista-pacientes" class="flex-1 overflow-y-auto space-y-2 max-h-[500px]">
+            <p class="text-xs text-slate-500 text-center py-12">Nenhum paciente na fila no momento.</p>
+          </div>
+        </div>
+
+        <!-- CONTEÚDO HUB 2: DASHBOARD BI AMBULATORIAL -->
+        <div id="hub-sec-bi" class="hidden flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-200 dark:border-slate-700 pb-3 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie text-emerald-500"></i> BI Ambulatorial - Produção
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Métricas completas em tempo real do município</p>
+            </div>
+            <span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-bold">● Tempo Real Activo</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-blue-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
+              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Concluídos Hoje</span>
+              <span id="bi-hoje" class="text-4xl font-black mt-2">0</span>
+            </div>
+            <div class="bg-emerald-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
+              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Concluídos Mês</span>
+              <span id="bi-mes" class="text-4xl font-black mt-2">0</span>
+            </div>
+            <div class="bg-purple-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
+              <span class="text-xs font-bold opacity-80 uppercase">Atendimentos Concluídos Ano</span>
+              <span id="bi-ano" class="text-4xl font-black mt-2">0</span>
+            </div>
+            <div class="bg-amber-600 text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between">
+              <span class="text-xs font-bold opacity-80 uppercase">Total de Acessos ao Sistema</span>
+              <span id="bi-total" class="text-4xl font-black mt-2">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTEÚDO HUB 3: EDITAR MEU PERFIL & FOTO -->
+        <div id="hub-sec-perfil" class="hidden flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl max-w-lg mx-auto w-full space-y-4">
+          <h3 class="text-lg font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-3 flex items-center gap-2">
+            <i class="fa-solid fa-user-pen text-cyan-500"></i> Editar Meu Perfil Profissional
+          </h3>
           
-          <div id="medico-lista-pacientes" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[350px] md:max-h-none">
-            <p class="text-xs text-slate-500 text-center py-8">Nenhum paciente na fila no momento.</p>
-          </div>
-
-          <div class="pt-3 border-t border-slate-200 dark:border-slate-700 mt-auto flex justify-end">
-            <button onclick="logoutMedico()" class="text-xs text-red-500 font-semibold px-3 py-1 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition">Sair do Consultório</button>
-          </div>
+          <form onsubmit="salvarPerfilMedico(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
+              <input type="text" id="edit-medico-nome" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CRM / UF</label>
+              <input type="text" id="edit-medico-crm" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Alterar Foto de Perfil</label>
+              <input type="file" id="edit-medico-foto" accept="image/*" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nova Senha (deixe em branco se não quiser alterar)</label>
+              <input type="password" id="edit-medico-senha" placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-emerald-600/20">Salvar Alterações</button>
+          </form>
         </div>
 
-        <div class="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 flex flex-col justify-center items-center text-center shadow-xl">
-          <div class="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-3xl mb-3">
-            <i class="fa-solid fa-stethoscope"></i>
-          </div>
-          <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-1">Consultório Médico Ativo</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm">Aguarde chamadas na fila e clique em "Chamar Paciente" para iniciar a teleconsulta com vídeo.</p>
-        </div>
       </div>
     </div>
 
@@ -278,6 +374,8 @@
             <p><strong class="text-white">Nome:</strong> <span id="info-paciente-nome">---</span></p>
             <p><strong class="text-white">Nascimento:</strong> <span id="info-paciente-nascimento">---</span></p>
             <p><strong class="text-white">CPF:</strong> <span id="info-paciente-cpf">---</span></p>
+            <p><strong class="text-white">Prioridade:</strong> <span id="info-paciente-prioridade" class="font-bold text-amber-400">---</span></p>
+            <p><strong class="text-white">Triagem:</strong> <span id="info-paciente-classificacao" class="font-bold text-emerald-400">---</span></p>
             <p><strong class="text-white">Telefone:</strong> <span id="info-paciente-telefone">---</span></p>
             <p><strong class="text-white">Endereço:</strong> <span id="info-paciente-endereco">---</span></p>
           </div>
@@ -337,7 +435,7 @@
     </div>
   </div>
 
-  <!-- MODAL ADMIN COM EXCLUSÃO DE PACIENTES -->
+  <!-- MODAL ADMIN -->
   <div id="modal-admin" class="hidden fixed inset-0 bg-slate-950/80 bg-blur z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 my-8">
       <div class="flex items-center justify-between pb-3 border-b border-slate-700">
@@ -388,6 +486,7 @@
     let pendingCandidates = [];
     let isAudioMuted = false;
     let isVideoOff = false;
+    let filaCompletaAtual = [];
 
     function mascaraData(v) {
       let val = v.value.replace(/\D/g, "");
@@ -487,6 +586,30 @@
       }
     }
 
+    function mudarAbaHub(aba) {
+      ['hub-sec-fila', 'hub-sec-bi', 'hub-sec-perfil'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      
+      document.getElementById('btn-hub-fila').className = "px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center gap-1.5";
+      document.getElementById('btn-hub-bi').className = "px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center gap-1.5";
+      document.getElementById('btn-hub-perfil').className = "px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center gap-1.5";
+
+      if (aba === 'fila') {
+        document.getElementById('hub-sec-fila').classList.remove('hidden');
+        document.getElementById('btn-hub-fila').className = "px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition";
+      } else if (aba === 'bi') {
+        document.getElementById('hub-sec-bi').classList.remove('hidden');
+        document.getElementById('btn-hub-bi').className = "px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition";
+        atualizarMetricasBI();
+      } else if (aba === 'perfil') {
+        document.getElementById('hub-sec-perfil').classList.remove('hidden');
+        document.getElementById('btn-hub-perfil').className = "px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition";
+        if (medicoLogado) {
+          document.getElementById('edit-medico-nome').value = medicoLogado.nome;
+          document.getElementById('edit-medico-crm').value = medicoLogado.crm;
+        }
+      }
+    }
+
     fetch('/api/tenant/info')
       .then(res => res.json())
       .then(t => {
@@ -503,8 +626,10 @@
       const cpf = document.getElementById('paciente-cpf').value;
       const telefone = document.getElementById('paciente-telefone').value;
       const endereco = document.getElementById('paciente-endereco').value;
+      const prioridade = document.getElementById('paciente-prioridade').value;
+      const classificacao = document.getElementById('paciente-classificacao').value;
 
-      socket.emit('entrar-fila', { nome, dataNascimento, cpf, telefone, endereco });
+      socket.emit('entrar-fila', { nome, dataNascimento, cpf, telefone, endereco, prioridade, classificacao });
       document.getElementById('paciente-form-container').classList.add('hidden');
       document.getElementById('paciente-espera-container').classList.remove('hidden');
     }
@@ -537,7 +662,31 @@
       document.getElementById('medico-logado-nome').innerText = medicoLogado.nome;
       document.getElementById('medico-logado-crm').innerText = 'CRM: ' + medicoLogado.crm;
       document.getElementById('medico-logado-foto').src = medicoLogado.foto || '/images/default-avatar.png';
-      document.getElementById('medico-logado-atendimentos').innerText = 'Atendimentos Concluídos: ' + (medicoLogado.atendimentosConcluidos || 0);
+      mudarAbaHub('fila');
+    }
+
+    function salvarPerfilMedico(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append('id', medicoLogado.id);
+      formData.append('nome', document.getElementById('edit-medico-nome').value);
+      formData.append('crm', document.getElementById('edit-medico-crm').value);
+      
+      const senha = document.getElementById('edit-medico-senha').value;
+      if (senha) formData.append('senha', senha);
+
+      const foto = document.getElementById('edit-medico-foto').files[0];
+      if (foto) formData.append('fotoPerfil', foto);
+
+      fetch('/api/medico/editar-perfil', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            medicoLogado = res.medico;
+            exibirDashboardMedico();
+            alert('Perfil atualizado com sucesso!');
+          } else { alert(res.error || 'Erro ao atualizar.'); }
+        });
     }
 
     function fazerCadastroMedico(e) {
@@ -564,25 +713,56 @@
     function logoutMedico() { location.reload(); }
 
     socket.on('atualizar-fila', (fila) => {
-      const container = document.getElementById('medico-lista-pacientes');
-      document.getElementById('medico-fila-count').innerText = fila.length;
+      filaCompletaAtual = fila;
+      renderizarFilaMedicos(filaCompletaAtual);
+    });
 
+    function filtrarFilaMedicos() {
+      const busca = document.getElementById('input-busca-fila').value.toLowerCase().trim();
+      if (!busca) {
+        renderizarFilaMedicos(filaCompletaAtual);
+        return;
+      }
+      const filtrada = filaCompletaAtual.filter(p => 
+        (p.nome && p.nome.toLowerCase().includes(busca)) || 
+        (p.cpf && p.cpf.toLowerCase().includes(busca))
+      );
+      renderizarFilaMedicos(filtrada);
+    }
+
+    function renderizarFilaMedicos(fila) {
+      const container = document.getElementById('medico-lista-pacientes');
       if (!fila.length) {
-        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-8">Nenhum paciente na fila no momento.</p>';
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-12">Nenhum paciente encontrado na fila.</p>';
         return;
       }
 
-      container.innerHTML = fila.map(p => `
-        <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between gap-2">
-          <div>
-            <span class="font-bold text-xs text-slate-900 dark:text-white block">${escapeHTML(p.nome)}</span>
-            <span class="text-[10px] text-slate-500 dark:text-slate-400 block">CPF: ${escapeHTML(p.cpf || 'N/I')}</span>
-            <span class="text-[10px] text-slate-500 dark:text-slate-400 block">Tel: ${escapeHTML(p.telefone || 'N/I')}</span>
+      container.innerHTML = fila.map(p => {
+        let classColor = 'bg-slate-500/20 text-slate-300 border-slate-500/30';
+        if (p.classificacao === 'EMERGÊNCIA') classColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+        if (p.classificacao === 'MUITO URGENTE') classColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+        if (p.classificacao === 'URGENTE') classColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+        if (p.classificacao === 'POUCO URGENTE') classColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+
+        return `
+          <div class="p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="font-extrabold text-xs text-slate-900 dark:text-white">${escapeHTML(p.nome)}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-black border ${classColor}">${p.classificacao || 'POUCO URGENTE'}</span>
+                ${p.prioridade && p.prioridade !== 'GERAL' ? `<span class="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30">${p.prioridade}</span>` : ''}
+              </div>
+              <div class="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
+                <span>CPF: ${escapeHTML(p.cpf || 'N/I')}</span>
+                <span>Nascimento: ${escapeHTML(p.dataNascimento || 'N/I')}</span>
+                <span>Tel: ${escapeHTML(p.telefone || 'N/I')}</span>
+              </div>
+            </div>
+            <button onclick="chamarPaciente('${p.id}')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow">Chamar para Consulta</button>
           </div>
-          <button onclick="chamarPaciente('${p.id}')" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition">Chamar</button>
-        </div>
-      `).join('');
-    });
+        `;
+      }).join('');
+    }
 
     async function chamarPaciente(pacienteSocketId) {
       targetSocketId = pacienteSocketId;
@@ -602,6 +782,8 @@
         document.getElementById('info-paciente-nome').innerText = paciente.nome || '---';
         document.getElementById('info-paciente-nascimento').innerText = paciente.dataNascimento || '---';
         document.getElementById('info-paciente-cpf').innerText = paciente.cpf || '---';
+        document.getElementById('info-paciente-prioridade').innerText = paciente.prioridade || 'Atendimento Geral';
+        document.getElementById('info-paciente-classificacao').innerText = paciente.classificacao || 'Pouco Urgente';
         document.getElementById('info-paciente-telefone').innerText = paciente.telefone || '---';
         document.getElementById('info-paciente-endereco').innerText = paciente.endereco || '---';
       }
@@ -830,9 +1012,6 @@
       limparEstadoConsulta();
 
       if (medicoLogado) {
-        if (medicoLogado.atendimentosConcluidos !== undefined) {
-          medicoLogado.atendimentosConcluidos += 1;
-        }
         exibirDashboardMedico();
       } else {
         location.reload();
@@ -885,6 +1064,15 @@
       });
     }
 
+    function atualizarMetricasBI() {
+      fetch('/api/admin/dados').then(r => r.json()).then(d => {
+        document.getElementById('bi-hoje').innerText = d.atendimentosHoje || 0;
+        document.getElementById('bi-mes').innerText = d.atendimentosMes || 0;
+        document.getElementById('bi-ano').innerText = d.atendimentosAno || 0;
+        document.getElementById('bi-total').innerText = d.totalGeralAcessos || 0;
+      });
+    }
+
     function carregarDadosAdmin() {
       fetch('/api/admin/dados').then(r => r.json()).then(d => {
         document.getElementById('stat-hoje').innerText = d.atendimentosHoje || 0;
@@ -895,7 +1083,7 @@
         document.getElementById('admin-lista-medicos').innerHTML = (d.medicos || []).map(m => `
           <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
             <div class="flex items-center gap-2">
-              <img src="${m.foto || '/images/default-avatar.png'}" class="w-7 h-7 rounded-full object-cover">
+              <img src="${m.foto || '/images/default-avatar.png'}" class="w-7 h-7 rounded-full object-cover border border-slate-700">
               <div>
                 <span class="font-bold text-white">${escapeHTML(m.nome)}</span> (CRM: ${m.crm}) - Atendimentos: <strong class="text-emerald-400">${m.atendimentosConcluidos || 0}</strong>
               </div>
@@ -912,7 +1100,7 @@
         document.getElementById('admin-lista-pacientes').innerHTML = (d.pacientes || []).map(p => `
           <div class="flex items-center justify-between text-xs text-slate-300 py-1.5 border-b border-slate-800">
             <div>
-              <span class="font-bold text-white">${escapeHTML(p.nome)}</span> | CPF: ${p.cpf || 'N/I'} | Nascimento: ${p.dataNascimento || 'N/I'}
+              <span class="font-bold text-white">${escapeHTML(p.nome)}</span> | CPF: ${p.cpf || 'N/I'} | Prioridade: ${p.prioridade || 'GERAL'}
             </div>
             <button onclick="excluirPaciente('${p.id}')" class="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded">Excluir</button>
           </div>
