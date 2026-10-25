@@ -86,7 +86,7 @@
     <!-- TELA PACIENTE -->
     <div id="screen-paciente" class="hidden flex-1 flex flex-col items-center justify-center py-6 gap-6">
       
-      <!-- CABEÇALHO DO PACIENTE LOGADO (SÓ APARECE QUANDO LOGADO) -->
+      <!-- CABEÇALHO DO PACIENTE LOGADO -->
       <div id="paciente-header-logado" class="hidden w-full max-w-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-xl">
         <div class="flex items-center gap-3">
           <img id="paciente-logado-foto" src="/images/default-avatar.png" class="w-12 h-12 rounded-full object-cover border-2 border-cyan-500 shadow">
@@ -806,6 +806,8 @@
     }
 
     function exibirPainelPacienteLogado() {
+      esconderTelas();
+      document.getElementById('screen-paciente').classList.remove('hidden');
       document.getElementById('paciente-header-logado').classList.remove('hidden');
       document.getElementById('paciente-logado-nome').innerText = pacienteLogado.nome;
       document.getElementById('paciente-logado-cpf').innerText = 'CPF: ' + pacienteLogado.cpf;
@@ -1390,9 +1392,9 @@
       if (medicoLogado) {
         exibirDashboardMedico();
       } else if (pacienteLogado) {
-        mudarAbaPaciente('entrar-fila');
+        exibirPainelPacienteLogado();
       } else {
-        location.reload();
+        voltarParaLanding();
       }
     }
 
@@ -1401,9 +1403,9 @@
       if (medicoLogado) {
         exibirDashboardMedico();
       } else if (pacienteLogado) {
-        mudarAbaPaciente('entrar-fila');
+        exibirPainelPacienteLogado();
       } else {
-        location.reload();
+        voltarParaLanding();
       }
     });
 
@@ -1418,10 +1420,22 @@
       }
       targetSocketId = null;
       pendingCandidates = [];
+      
       const remoteVideo = document.getElementById('remote-video');
       if (remoteVideo) remoteVideo.srcObject = null;
+      
       const localVideo = document.getElementById('local-video');
       if (localVideo) localVideo.srcObject = null;
+
+      const chatBox = document.getElementById('chat-messages');
+      if (chatBox) {
+        chatBox.innerHTML = '<p class="text-[10px] text-slate-500 text-center">Os documentos e receitas enviados durante a consulta aparecerão aqui para download.</p>';
+      }
+
+      const anamneseEl = document.getElementById('anamnese-texto');
+      if (anamneseEl) anamneseEl.value = '';
+
+      esconderTelas();
     }
 
     function abrirModalAdmin() { document.getElementById('modal-admin').classList.remove('hidden'); }
